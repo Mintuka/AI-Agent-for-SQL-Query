@@ -1,0 +1,11 @@
+python-dotenv
+flask
+flask-cors
+langchain
+langchain-openai
+langchain-community
+langchain_chroma
+langchain_core
+langchain_text_splitters
+requests
+bs4
