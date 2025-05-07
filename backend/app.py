@@ -19,7 +19,7 @@ import os
 load_dotenv()
 app = Flask(__name__)
 
-CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://104.154.92.239", "http://104.154.92.239:80"])
 
 chat_history_store = {}
 

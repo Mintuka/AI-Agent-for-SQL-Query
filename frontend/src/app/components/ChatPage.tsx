@@ -103,7 +103,7 @@ const ChatPage = () => {
         setLoading(true);
     
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate`, 
+          const response = await fetch(`http://34.123.108.230:8080/generate`, 
             getFetchOptions('POST', question, selectChat?.session_id)
           );
     
