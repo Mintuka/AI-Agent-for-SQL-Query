@@ -10,3 +10,15 @@ export const getFetchOptions = (method: string, question: string, session_id: st
       mode: 'cors' as RequestMode,
       credentials: 'include' as RequestCredentials
   });
+
+  export const loginOptions = (method: string, email: string, password: string) => ({
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+    mode: 'cors' as RequestMode,
+});

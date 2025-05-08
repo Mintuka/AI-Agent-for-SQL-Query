@@ -11,7 +11,7 @@ services:
       - ./frontend:/frontend
       - /frontend/node_modules
     env_file:
-      - .env
+      - /frontend/.env
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
@@ -28,7 +28,7 @@ services:
     volumes:
       - ./backend:/backend
     env_file:
-      - ./.env
+      - backend/.env
     environment:
       - FLASK_ENV=development
     networks:

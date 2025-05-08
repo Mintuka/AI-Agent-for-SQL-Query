@@ -1,3 +1,4 @@
+import datetime
 from dotenv import load_dotenv
 from flask_cors import CORS
 from flask import Flask, Response, request, session, send_file, jsonify, redirect, url_for, render_template, send_from_directory, flash
@@ -19,11 +20,91 @@ import os
 load_dotenv()
 app = Flask(__name__)
 
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://104.154.92.239", "http://104.154.92.239:80"])
+CORS(
+    app,
+    supports_credentials=True,
+    origins=["http://localhost:3000", "http://104.154.92.239", "http://104.154.92.239:80"],  # No port 80 needed
+    methods=["GET", "POST", "OPTIONS"],  # Explicitly allow OPTIONS
+    allow_headers=["Content-Type", "Authorization"],  # Required for credentials
+    expose_headers=["Content-Type"]
+)
 
 chat_history_store = {}
 
-@app.route("/", methods=["GET"])
+from flask import Flask, request, jsonify
+from pymongo import MongoClient
+
+app = Flask(__name__)
+
+# Connect to MongoDB (adjust the URI as needed)
+client = MongoClient(os.environ.get('MONGODB_URL'))
+db = client['querygpt']
+users_collection = db['users']
+
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    if origin in ["http://localhost:3000", "http://127.0.0.1:3000"]:
+        response.headers.update({
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        })
+    return response
+
+@app.route('/register', methods=['POST'])
+def register():
+    if request.method == "OPTIONS":
+        return '', 204
+    data = request.get_json() or {}
+    email = data.get('email')
+    password = data.get('password')
+    
+    # Check if user already exists
+    isPasswordExisting = users_collection.find_one({'password': password})
+    isEmailExisting = users_collection.find_one({'email': email})
+    if isPasswordExisting or isEmailExisting:
+        return jsonify({'error': 'Email or Password already exists'}), 400
+    
+    new_user = {
+        'email': email,
+        'password': password,
+        # 'created_at': datetime.utcnow()
+    }
+    
+    result = users_collection.insert_one(new_user)
+    
+    return jsonify({
+        'message': 'User registered successfully',
+        'user_id': str(result.inserted_id)
+    }), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    if request.method == "OPTIONS":
+        return '', 204
+    data = request.get_json() or {}
+    email = data.get('email')
+    password = data.get('password')
+    
+    # Check if user already exists
+    isPasswordExisting = users_collection.find_one({'password': password})
+    isEmailExisting = users_collection.find_one({'email': email})
+    if not isPasswordExisting or not isEmailExisting:
+        return jsonify({'error': 'Incorrect email or password'}), 400
+    
+    
+    return jsonify({
+        'message': 'User logged in successfully',
+    }), 200
+
+@app.route('/documents', methods=['GET'])
+def get_documents():
+    docs = list(users_collection.find({}, {'_id': 0}))
+    return jsonify(docs), 200
+
+@app.route("/test", methods=["GET"])
 def getall():
     return jsonify({"answer": "hello", "session_id": "23fd23"})
 
@@ -82,7 +163,6 @@ def generate():
         qa_system_prompt = """You are an assistant for question-answering tasks. \
         Use the following pieces of retrieved context to answer the question. \
         If you don't know the answer, just say that you don't know. \
-        Use three sentences maximum and keep the answer concise.\
 
         {context}"""
         qa_prompt = ChatPromptTemplate.from_messages(

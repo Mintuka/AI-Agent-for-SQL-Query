@@ -6,34 +6,7 @@ import { getFetchOptions } from '../utils/component-utils'
 const ChatPage = () => {
     const [question, setQuestion] = useState('');
     const [selectChat, setSelectChat] = useState<ChatHistory>({session_id: "", title: "", timestamp: 0, history: []});
-    const [chatHistory, setChatHistory] = useState<ChatHistory[]>([
-        {
-          session_id: "1",
-          title: "First Tech Support Query",
-          timestamp: Date.now() - 3600000, // 1 hour ago
-          history: [
-            {
-              question: "How do I reset my password?",
-              answer: "You can reset it by clicking 'Forgot Password' on the login page."
-            },
-            {
-              question: "Where is the forgot password button?",
-              answer: "It's below the email field, colored in blue."
-            }
-          ]
-        },
-        {
-          session_id: "2",
-          title: "Product Inquiry",
-          timestamp: Date.now() - 86400000, // 1 day ago
-          history: [
-            {
-              question: "What's the difference between Pro and Basic plans?",
-              answer: "The Pro plan includes advanced analytics and priority support."
-            }
-          ]
-        }
-      ])
+    const [chatHistory, setChatHistory] = useState<ChatHistory[]>([])
     const [loading, setLoading] = useState(false)
     const [hideOption, setHideOption] = useState('')
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -103,7 +76,8 @@ const ChatPage = () => {
         setLoading(true);
     
         try {
-          const response = await fetch(`http://34.123.108.230:8080/generate`, 
+          // const response = await fetch(`http://34.123.108.230:8080/generate`,
+          const response = await fetch(`http://localhost:8080/generate`,
             getFetchOptions('POST', question, selectChat?.session_id)
           );
     
@@ -122,7 +96,6 @@ const ChatPage = () => {
           else {
             newTitle = `${question}`
           } 
-          
           const parts = answer.split(/[a-zA-Z]:/).slice(1);
           const finalAnswer = parts.join(' ').trim()
           let newSessions:ChatHistory[] = [...chatHistory]
@@ -235,7 +208,7 @@ const ChatPage = () => {
                                 value={question}
                                 onChange={(e) => setQuestion(e.target.value)}
                                 placeholder="Ask a question about the content..."
-                                className="flex-1 pl-4 pr-9 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] max-h-[200px] resize-y overflow-auto scrollbar-custom"
+                                className="flex-1 border pl-4 pr-9 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] max-h-[200px] resize-y overflow-auto scrollbar-custom"
                             />
                             <button
                                 type="submit"
