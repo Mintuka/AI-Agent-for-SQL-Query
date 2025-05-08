@@ -97,6 +97,21 @@ webpackDevMiddleware: (config: WebpackConfigContext['webpack']) => {
 
 ## Deployment
 
+### Create Your Cluster
+
+To run the project in your own Google Cloud Clusters
+1. Run the script in kubernetes/create-cluster.sh
+```bash
+cd kubernetes
+./create-cluster.sh
+```
+
+2. Update the docker image in frontend/frontend-deployment.yaml with your docker hub image
+```image: mintuka2015/querygpt-frontend:v1.1```
+
+3. Update the docker image in backend/backend-deployment.yaml with your docker hub image
+```image: mintuka2015/querygpt-backend:v1.1```
+
 ### Deploy Frontend Changes
 
 ```bash
