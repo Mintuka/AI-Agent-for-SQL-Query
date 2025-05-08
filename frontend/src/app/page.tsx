@@ -5,10 +5,6 @@ import {useState, useEffect} from 'react'
 import { loginOptions } from "./utils/component-utils";
 import { LoginPage, RegisterPage } from "./components/AuthPage";
 
-type ChildProps = {
-  setState: React.Dispatch<React.SetStateAction<string>>;
-};
-
 export default function Home() {
   const [state, setState] = useState('login')
   useEffect(() => {
@@ -16,8 +12,9 @@ export default function Home() {
       try {
         const username = localStorage.getItem('username') || ''
         const password = localStorage.getItem('password') || ''
+        const {status} = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/login`,
         // const {status} = await fetch(`http://34.123.108.230:8080/login`, 
-        const {status} = await fetch(`http://localhost:8080/login`,
+        // const {status} = await fetch(`http://localhost:8080/login`,
           loginOptions('POST', username, password)
         );
         if (status == 200 && state != 'home'){

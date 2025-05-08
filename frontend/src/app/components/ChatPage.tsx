@@ -17,12 +17,12 @@ const ChatPage = () => {
       console.log('his', chatHistory)
     },[chatHistory])
 
-    useEffect(() => {
-      return () => {
-        timerRef.current.forEach(timer => clearTimeout(timer));
-        timerRef.current = [];
-      };
-    }, []);
+    // useEffect(() => {
+    //   return () => {
+    //     timerRef.current.forEach(timer => clearTimeout(timer));
+    //     timerRef.current = [];
+    //   };
+    // }, [selectChat]);
 
     useEffect(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
@@ -56,7 +56,7 @@ const ChatPage = () => {
               } else {
                 updatedHistory[lastChatIndex] = {
                   ...updatedHistory[lastChatIndex],
-                  answer: `${updatedHistory[lastChatIndex].answer} ${word}`
+                  answer: `${updatedHistory[lastChatIndex]?.answer} ${word}`
                 };
               }
               return {
@@ -76,8 +76,9 @@ const ChatPage = () => {
         setLoading(true);
     
         try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate`,
           // const response = await fetch(`http://34.123.108.230:8080/generate`,
-          const response = await fetch(`http://localhost:8080/generate`,
+          // const response = await fetch(`http://localhost:8080/generate`,
             getFetchOptions('POST', question, selectChat?.session_id)
           );
     
@@ -212,7 +213,7 @@ const ChatPage = () => {
                             />
                             <button
                                 type="submit"
-                                className="absolute right-3 bottom-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-2 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                className="absolute cursor-pointer right-3 bottom-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-2 py-2 rounded-lg transition-colors flex items-center gap-2"
                                 disabled={loading}
                             >
                                 {loading ? (

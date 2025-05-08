@@ -1,4 +1,3 @@
-import datetime
 from dotenv import load_dotenv
 from flask_cors import CORS
 from flask import Flask, Response, request, session, send_file, jsonify, redirect, url_for, render_template, send_from_directory, flash
@@ -23,7 +22,7 @@ app = Flask(__name__)
 CORS(
     app,
     supports_credentials=True,
-    origins=["http://localhost:3000", "http://104.154.92.239", "http://104.154.92.239:80"],  # No port 80 needed
+    origins=["http://localhost:3000", "http://104.154.92.239", "http://104.154.92.239:80","http://104.154.92.239/:1"],  # No port 80 needed
     methods=["GET", "POST", "OPTIONS"],  # Explicitly allow OPTIONS
     allow_headers=["Content-Type", "Authorization"],  # Required for credentials
     expose_headers=["Content-Type"]
@@ -44,12 +43,20 @@ users_collection = db['users']
 @app.after_request
 def after_request(response):
     origin = request.headers.get('Origin')
-    if origin in ["http://localhost:3000", "http://127.0.0.1:3000"]:
+    allowed_prefixes = [
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://104.154.92.239",
+        "http://104.154.92.239:8080",
+        "http://104.154.92.239/:1"
+    ]
+
+    if origin and any(origin.startswith(p) for p in allowed_prefixes):
         response.headers.update({
             'Access-Control-Allow-Origin': origin,
             'Access-Control-Allow-Credentials': 'true',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         })
     return response
 

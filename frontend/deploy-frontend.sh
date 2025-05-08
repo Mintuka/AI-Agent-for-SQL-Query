@@ -1,5 +1,5 @@
 #!/bin/bash
-kubectl create configmap frontend-config --from-env-file=.env
+kubectl create configmap frontend-config --from-env-file=.env --dry-run=client -o yaml | kubectl replace -f -
 #build frontend docker image
 docker build -t mintuka2015/querygpt-frontend:v1.1 . --no-cache
 #push the image to docker hub

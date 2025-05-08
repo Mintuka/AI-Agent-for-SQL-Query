@@ -14,8 +14,9 @@ export const LoginPage = ({setState}: ChildProps) => {
         if (authLoading) return
         try {
           setAuthLoading(true)
-          // const response = await fetch(`http://34.123.108.230:8080/login`, 
-          const {status} = await fetch(`http://localhost:8080/login`, 
+          const {status} = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/login`,
+          // const {status} = await fetch(`http://34.123.108.230:8080/login`,
+          // const {status} = await fetch(`http://localhost:8080/login`, 
             loginOptions('POST', username, password)
           );
     
@@ -56,8 +57,9 @@ export const RegisterPage = ({setState}: ChildProps) => {
           if (authLoading) return
           try {
             setAuthLoading(true)
-            // const response = await fetch(`http://34.123.108.230:8080/register`,
-            const {status} = await fetch(`http://localhost:8080/register`,
+            const {status} = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/register`,
+              // const {status} = await fetch(`http://34.123.108.230:8080/register`,
+            // const {status} = await fetch(`http://localhost:8080/register`,
               loginOptions('POST', username, password)
             );
       
