@@ -1,4 +1,4 @@
-# QueryGPT - AI-Powered Query Assistant
+# AI-Agent-for-SQL-Query
 
 ## Overview
 

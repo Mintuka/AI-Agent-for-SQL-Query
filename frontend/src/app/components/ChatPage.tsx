@@ -5,8 +5,8 @@ import { getFetchOptions } from '../utils/component-utils'
 
 const ChatPage = () => {
     const [question, setQuestion] = useState('');
-    const [selectChat, setSelectChat] = useState<ChatHistory>({session_id: "", title: "", timestamp: 0, history: []});
-    const [chatHistory, setChatHistory] = useState<ChatHistory[]>([])
+    const [selectChat, setSelectChat] = useState<ChatHistory>({session_id: "1", title: "New Chat", timestamp: 0, history: [{question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}, {question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}, {question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}, {question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}]});
+    const [chatHistory, setChatHistory] = useState<ChatHistory[]>([{session_id: "1", title: "New Chat", timestamp: 0, history: [{question: "Hello", answer: "Hello"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}]);
     const [loading, setLoading] = useState(false)
     const [hideOption, setHideOption] = useState('')
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -77,8 +77,6 @@ const ChatPage = () => {
     
         try {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate`,
-          // const response = await fetch(`http://34.123.108.230:8080/generate`,
-          // const response = await fetch(`http://localhost:8080/generate`,
             getFetchOptions('POST', question, selectChat?.session_id)
           );
     
@@ -153,48 +151,88 @@ const ChatPage = () => {
     }
 
     return (
-        <div className="w-full fixed top-[100px]">
+        <div className="w-full fixed">
             <div className="flex">
                 {/* Chat History */}
-                <div className="relative flex flex-col w-1/4 h-[calc(100vh_-_100px)] overflow-y-scroll scrollbar-history ">
-                    <div className="font-bold sticky top-0 bg-gray-100 dark:bg-gray-800 rounded-md mx-1 p-1">Q&A History</div>
-                    <div className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-2 py-2 rounded-lg transition-colors flex items-center mx-1 mb-2 w-fit cursor-pointer" onClick={startNewChat}>New Chat</div>
+                <div className="relative flex flex-col w-1/5 rounded-[20px] m-4 p-4 bg-white h-[calc(100vh_-_2rem)] overflow-y-scroll scrollbar-custom">
+                    <div className="font-bold text-lg sticky top-0 mx-1 mb-8 p-1">QueryGPT</div>
+                    <div className="flex items-center justify-center w-4/5 bg-blue-500 hover:bg-blue-600 text-white px-2 py-2 rounded-full transition-colors mx-1 mb-2 cursor-pointer" onClick={startNewChat}>
+                      <i className="fa-solid fa-plus mx-2"></i>
+                      <span className="text-sm">New Chat</span>
+                    </div>
+                    <div className="flex justify-between text-[0.75rem] py-2 my-2 border-t-1 border-b-1 border-gray-300">
+                      <div>Your Conversations</div>
+                      <div className="text-blue-700">Clear All</div>
+                    </div>
                     {
                         chatHistory.length > 0
                         ?
                         chatHistory.map((session, index) => 
-                        <div id={`title-${selectChat?.session_id}`} key={`session-${index}`} className={`flex items-center relative m-1 p-1 hover:cursor-pointer  ${selectChat?.session_id == session.session_id ? 'text-gray-100 rounded-md bg-gray-700' : 'text-gray-500 hover:bg-gray-100' }`} onClick={() => handleSelectChat(session)}>
-                            <span>{session.title}</span> <span className="absolute right-4 z-1" onClick={(e) => handleMenu(e, session.session_id)}>...</span>
-                            {
-                            hideOption == session.session_id
-                            ?
-                            <div className="flex items-center shadow-md absolute top-6 right-4 z-50 flex py-2 px-4 bg-white rounded-md" onClick={(e) => handleDelete(e, selectChat?.session_id)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-5 text-red-500">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                              </svg>
-                              <span className="ml-1 text-red-500">Delete</span>
+                        <div id={`title-${selectChat?.session_id}`} key={`session-${index}`} className={`flex items-center justify-between relative hover:cursor-pointer text-sm my-1 py-1 px-2  ${selectChat?.session_id == session.session_id ? 'rounded-md bg-[#f2f5fa]' : 'hover:bg-gray-100' }`} onClick={() => handleSelectChat(session)}>
+                            <div className="flex items-center justify-center">
+                              <i className={`fa-regular fa-comment-dots mr-2 ${selectChat?.session_id == session.session_id ? 'text-blue-500' : ''}`}></i>
+                              <span className={`${selectChat?.session_id == session.session_id ? 'text-blue-500' : ''}`}>{session.title}</span> 
                             </div>
-                            :
-                            <div></div>
+                            {
+                              selectChat?.session_id == session.session_id ?
+
+                              <div className="flex items-center flex py-2 px-4" onClick={(e) => handleDelete(e, selectChat?.session_id)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-5 text-red-500">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                </svg>
+                              </div>
+                              :
+                              <div></div>
                             }
                         </div>
                         )
                         :
                         <div className="text-gray-500 mx-1 p-1">No history</div>
                     }
+                    <div className="absolute bottom-0 text-sm w-4/5">
+                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1">
+                        <div className="w-[30px] h-[30px] flex items-center justify-center rounded-full bg-gray-200 mr-2">
+                          <i className="fa-solid fa-gear text-md"></i>
+                        </div>
+                        <span>Settings</span>
+                      </div>
+                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1">
+                        <img className="rounded-full w-[30px] h-[30px] mr-2" src="/man.png"/>
+                        <span>Minte Kassa</span>
+                      </div>
+                    </div>
                 </div>
-                <div className="w-3/4 h-[calc(100vh_-_100px)] fixed right-0 bottom-0 ml-4">
+                <div className="w-3/5 h-[calc(100vh_-_2rem)] fixed right-0 bottom-0 m-4 px-4">
                     {/* Chat Messages */}
                     {selectChat?.history && (
-                        <div className="mb-4 max-h-[350px] overflow-y-scroll scrollbar-hide">
+                        <div className="mb-4 max-h-[400px] overflow-y-scroll scrollbar-hide">
                         {
                             selectChat?.history
                             .map((chat,index) => 
-                            <div key={index}>
-                                <div className="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4 mb-4">
-                                  <p className="text-gray-700 dark:text-gray-400">{chat.question}</p>
+                            <div className="mb-8" key={index}>
+                                <div className="relative flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg mb-2">
+                                  <img src="/man.png" className="w-[30px] h-[30px] mr-2"/> 
+                                  <p className="text-gray-700 text-sm dark:text-gray-400">{chat.question}</p>
+                                  <i class="absolute right-1 top-1 fa-regular fa-pen-to-square text-sm text-gray-500"></i>
                                 </div>
-                                <p className="text-gray-700 text-justify dark:text-gray-300 mb-4">{chat.answer}</p>
+                                <div className="ml-4">
+                                  <div className="text-blue-500 flex items-center mb-2">
+                                    <span className="mr-2 text-sm">QueryGPT</span>
+                                    <img src="/chatbot.png" className="w-[20px] h-[20px]" alt="chatbot" />
+                                  </div>
+                                  <p className="text-gray-700 text-justify text-sm dark:text-gray-300 mb-4">{chat.answer}</p>
+                                </div>
+                                <div className="flex items-center justify-between text-sm ml-4">
+                                  <div className="flex p-2 rounded-full bg-white">
+                                    <i class="fa-regular fa-thumbs-up text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
+                                    <i class="fa-regular fa-thumbs-down text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
+                                    <i class="fa-regular fa-copy text-gray-400 cursor-pointer mx-2"></i>
+                                  </div>
+                                  <div className="flex items-center p-2 bg-white rounded-full cursor-pointer">
+                                    <i class="fa-solid fa-rotate text-gray-500 mr-2"></i>
+                                    <div className="text-sm">Regenerate</div>
+                                  </div>
+                                </div>
                             </div>
                             )
                         }
@@ -203,29 +241,59 @@ const ChatPage = () => {
                     )}
                     
                     {/* Question Input*/}
-                    <form onSubmit={handleAskQuestion} className="w-full space-y-4 absolute right-1 bottom-1">
+                    <form onSubmit={handleAskQuestion} className="w-3/4 space-y-4 absolute bottom-3">
                         <div className="relative flex gap-2">
                             <textarea
                                 value={question}
                                 onChange={(e) => setQuestion(e.target.value)}
                                 placeholder="Ask a question about the content..."
-                                className="flex-1 border pl-4 pr-9 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] max-h-[200px] resize-y overflow-auto scrollbar-custom"
+                                className="flex-1 border pl-4 pr-9 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg outline-none min-h-[100px] max-h-[200px] resize-y overflow-auto scrollbar-custom"
                             />
-                            <button
-                                type="submit"
-                                className="absolute cursor-pointer right-3 bottom-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-2 py-2 rounded-lg transition-colors flex items-center gap-2"
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                </>
-                                ) : (
-                                <>
-                                    {/* <ArrowUpIcon strokeWidth={2} className="h-5 w-5" /> */}Go
-                                </>
-                                )}
-                            </button>
+                            <div className="absolute right-3 bottom-3 flex items-center justify-center gap-2">
+                              <button
+                                  className="cursor-pointer hover:bg-gray-200 text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2"
+                                  disabled={loading}
+                              >
+                                  {loading ? (
+                                  <>
+                                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                  </>
+                                  ) : (
+                                  <>
+                                      <img src="/smile.png" alt="send" className="w-5 h-5" />
+                                  </>
+                                  )}
+                              </button>
+                              <button
+                                  className="cursor-pointer hover:bg-gray-200 text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2"
+                                  disabled={loading}
+                              >
+                                  {loading ? (
+                                  <>
+                                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                  </>
+                                  ) : (
+                                  <>
+                                      <img src="/attach.png" alt="send" className="w-5 h-5" />
+                                  </>
+                                  )}
+                              </button>
+                              <button
+                                  type="submit"
+                                  className="cursor-pointer hover:bg-gray-200 text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2"
+                                  disabled={loading}
+                              >
+                                  {loading ? (
+                                  <>
+                                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                  </>
+                                  ) : (
+                                  <>
+                                      <img src="/send.png" alt="send" className="w-5 h-5" />
+                                  </>
+                                  )}
+                              </button>
+                            </div>
                         </div>
                     </form>
                 </div>
