@@ -2,11 +2,12 @@
 import {useState, useEffect, useRef} from 'react'
 import {Chat, ChatHistory} from '../types/compoent-types'
 import { getFetchOptions } from '../utils/component-utils'
+import Image from 'next/image';
 
 const ChatPage = () => {
     const [question, setQuestion] = useState('');
-    const [selectChat, setSelectChat] = useState<ChatHistory>({session_id: "1", title: "New Chat", timestamp: 0, history: [{question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}, {question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}, {question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}, {question: "Fill a larger container or sink with warm water", answer: "Detaching ice from its container can be tricky, but here are some easy methods depending on the type of container"}]});
-    const [chatHistory, setChatHistory] = useState<ChatHistory[]>([{session_id: "1", title: "New Chat", timestamp: 0, history: [{question: "Hello", answer: "Hello"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}, {session_id: "2", title: "New gfsdg Chat", timestamp: 10, history: [{question: "Hello 2", answer: "Hello 2"}]}]);
+    const [selectChat, setSelectChat] = useState<ChatHistory>({session_id: "", title: "", timestamp: 0, history: []});
+    const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
     const [loading, setLoading] = useState(false)
     const [hideOption, setHideOption] = useState('')
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -139,30 +140,20 @@ const ChatPage = () => {
         })
       }
 
-    const handleMenu = (e:React.MouseEvent, session_id:string) => {
-      e.preventDefault()
-      e.stopPropagation()
-      if (hideOption == session_id) {
-        setHideOption('')  
-      }
-      else {
-        setHideOption(session_id)
-      }
-    }
 
     return (
         <div className="w-full fixed">
             <div className="flex">
                 {/* Chat History */}
-                <div className="relative flex flex-col w-1/5 rounded-[20px] m-4 p-4 bg-white h-[calc(100vh_-_2rem)] overflow-y-scroll scrollbar-custom">
-                    <div className="font-bold text-lg sticky top-0 mx-1 mb-8 p-1">QueryGPT</div>
+                <div className="relative flex flex-col w-1/5 rounded-[20px] m-4 p-4 bg-white h-[calc(100vh_-_2rem)] overflow-y-scroll scrollbar-hide">
+                    <div className="font-bold text-lg sticky top-0 mx-1 mb-8 p-1">GenSQL</div>
                     <div className="flex items-center justify-center w-4/5 bg-blue-500 hover:bg-blue-600 text-white px-2 py-2 rounded-full transition-colors mx-1 mb-2 cursor-pointer" onClick={startNewChat}>
                       <i className="fa-solid fa-plus mx-2"></i>
                       <span className="text-sm">New Chat</span>
                     </div>
                     <div className="flex justify-between text-[0.75rem] py-2 my-2 border-t-1 border-b-1 border-gray-300">
                       <div>Your Conversations</div>
-                      <div className="text-blue-700">Clear All</div>
+                      <div className="text-blue-700 cursor-pointer">Clear All</div>
                     </div>
                     {
                         chatHistory.length > 0
@@ -190,14 +181,14 @@ const ChatPage = () => {
                         <div className="text-gray-500 mx-1 p-1">No history</div>
                     }
                     <div className="absolute bottom-0 text-sm w-4/5">
-                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1">
+                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1 cursor-pointer">
                         <div className="w-[30px] h-[30px] flex items-center justify-center rounded-full bg-gray-200 mr-2">
                           <i className="fa-solid fa-gear text-md"></i>
                         </div>
                         <span>Settings</span>
                       </div>
-                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1">
-                        <img className="rounded-full w-[30px] h-[30px] mr-2" src="/man.png"/>
+                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1 cursor-pointer">
+                        <Image className="rounded-full mr-2" width={30} height={30} src="/man.png" alt="user"/>
                         <span>Minte Kassa</span>
                       </div>
                     </div>
@@ -211,26 +202,26 @@ const ChatPage = () => {
                             .map((chat,index) => 
                             <div className="mb-8" key={index}>
                                 <div className="relative flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg mb-2">
-                                  <img src="/man.png" className="w-[30px] h-[30px] mr-2"/> 
+                                  <Image src="/man.png" className="mr-2" width={30} height={30} alt="user"/> 
                                   <p className="text-gray-700 text-sm dark:text-gray-400">{chat.question}</p>
-                                  <i class="absolute right-1 top-1 fa-regular fa-pen-to-square text-sm text-gray-500"></i>
+                                  <i className="absolute right-1 top-1 fa-regular fa-pen-to-square text-sm text-gray-500 cursor-pointer"></i>
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-blue-500 flex items-center mb-2">
-                                    <span className="mr-2 text-sm">QueryGPT</span>
-                                    <img src="/chatbot.png" className="w-[20px] h-[20px]" alt="chatbot" />
+                                    <span className="mr-2 text-sm">GenSQL</span>
+                                    <Image src="/chatbot.png" width={20} height={20} alt="chatbot"/>
                                   </div>
                                   <p className="text-gray-700 text-justify text-sm dark:text-gray-300 mb-4">{chat.answer}</p>
                                 </div>
                                 <div className="flex items-center justify-between text-sm ml-4">
                                   <div className="flex p-2 rounded-full bg-white">
-                                    <i class="fa-regular fa-thumbs-up text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
-                                    <i class="fa-regular fa-thumbs-down text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
-                                    <i class="fa-regular fa-copy text-gray-400 cursor-pointer mx-2"></i>
+                                    <i className="fa-regular fa-thumbs-up text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
+                                    <i className="fa-regular fa-thumbs-down text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
+                                    <i className="fa-regular fa-copy text-gray-400 cursor-pointer mx-2"></i>
                                   </div>
-                                  <div className="flex items-center p-2 bg-white rounded-full cursor-pointer">
-                                    <i class="fa-solid fa-rotate text-gray-500 mr-2"></i>
-                                    <div className="text-sm">Regenerate</div>
+                                  <div className="flex items-center p-2 bg-white rounded-full cursor-pointer text-sm">
+                                    <i className="fa-solid fa-rotate text-gray-500 mr-2"></i>
+                                    <div className="text-sm text-gray-700">Regenerate</div>
                                   </div>
                                 </div>
                             </div>
@@ -247,7 +238,7 @@ const ChatPage = () => {
                                 value={question}
                                 onChange={(e) => setQuestion(e.target.value)}
                                 placeholder="Ask a question about the content..."
-                                className="flex-1 border pl-4 pr-9 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg outline-none min-h-[100px] max-h-[200px] resize-y overflow-auto scrollbar-custom"
+                                className="flex-1 border pl-4 pr-9 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg outline-none min-h-[100px] max-h-[200px] resize-y overflow-auto scrollbar-hide"
                             />
                             <div className="absolute right-3 bottom-3 flex items-center justify-center gap-2">
                               <button
@@ -260,7 +251,7 @@ const ChatPage = () => {
                                   </>
                                   ) : (
                                   <>
-                                      <img src="/smile.png" alt="send" className="w-5 h-5" />
+                                      <Image src="/smile.png" alt="emoji" width={15} height={15}/>
                                   </>
                                   )}
                               </button>
@@ -274,7 +265,7 @@ const ChatPage = () => {
                                   </>
                                   ) : (
                                   <>
-                                      <img src="/attach.png" alt="send" className="w-5 h-5" />
+                                      <Image src="/attach.png" alt="file" width={15} height={15} />
                                   </>
                                   )}
                               </button>
@@ -289,7 +280,7 @@ const ChatPage = () => {
                                   </>
                                   ) : (
                                   <>
-                                      <img src="/send.png" alt="send" className="w-5 h-5" />
+                                      <Image src="/send.png" alt="send" width={15} height={15} />
                                   </>
                                   )}
                               </button>

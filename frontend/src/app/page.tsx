@@ -1,6 +1,5 @@
 'use client'
 import ChatPage from "./components/ChatPage";
-import NavBar from "./components/NavBar";
 import {useState, useEffect} from 'react'
 import { loginOptions } from "./utils/component-utils";
 import { LoginPage, RegisterPage } from "./components/AuthPage";
