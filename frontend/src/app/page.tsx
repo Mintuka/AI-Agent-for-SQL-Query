@@ -5,7 +5,7 @@ import { loginOptions } from "./utils/component-utils";
 import { LoginPage, RegisterPage } from "./components/AuthPage";
 
 export default function Home() {
-  const [state, setState] = useState('home')
+  const [state, setState] = useState('login')
   useEffect(() => {
     const fetchData = async () => {
       try {

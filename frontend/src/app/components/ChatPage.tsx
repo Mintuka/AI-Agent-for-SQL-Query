@@ -3,13 +3,16 @@ import {useState, useEffect, useRef} from 'react'
 import {Chat, ChatHistory} from '../types/compoent-types'
 import { getFetchOptions } from '../utils/component-utils'
 import Image from 'next/image';
+import AddSchema from './AddSchema';
+import Settings from './Settings';
 
 const ChatPage = () => {
     const [question, setQuestion] = useState('');
     const [selectChat, setSelectChat] = useState<ChatHistory>({session_id: "", title: "", timestamp: 0, history: []});
     const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
     const [loading, setLoading] = useState(false)
-    const [hideOption, setHideOption] = useState('')
+    const [isAddSchema, setAddSchema] = useState<boolean>(false)
+    const [isSetting, setSettings] = useState<boolean>(false)
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const timerRef = useRef<NodeJS.Timeout[]>([])
 
@@ -29,15 +32,16 @@ const ChatPage = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
     }, [selectChat]);
 
+    const addSchema = () => {
+      setAddSchema(true)
+    }
+
     const startNewChat = () => {
         setSelectChat({session_id:'', timestamp:0, title:'', history: []})
       }
 
     const handleSelectChat = (session: ChatHistory) => {
         setSelectChat({...session})
-        if (hideOption != '') {
-          setHideOption('')
-        }
       }
 
     const handleResponseGeneration = (answer: string) => {
@@ -143,8 +147,14 @@ const ChatPage = () => {
 
     return (
         <div className="w-full fixed">
+            {isAddSchema && <AddSchema setAddSchema={setAddSchema}></AddSchema>}
+            {isSetting && <Settings setSettings={setSettings} ></Settings>}
             <div className="flex">
                 {/* Chat History */}
+                <div className="fixed left-72 top-4 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full transition-colors mx-1 mb-2 cursor-pointer" onClick={addSchema}>
+                  <i className="fa-solid fa-plus mx-2"></i>
+                  <span className="text-sm">Add Schema</span>
+                </div>
                 <div className="relative flex flex-col w-1/5 rounded-[20px] m-4 p-4 bg-white h-[calc(100vh_-_2rem)] overflow-y-scroll scrollbar-hide">
                     <div className="font-bold text-lg sticky top-0 mx-1 mb-8 p-1">GenSQL</div>
                     <div className="flex items-center justify-center w-4/5 bg-blue-500 hover:bg-blue-600 text-white px-2 py-2 rounded-full transition-colors mx-1 mb-2 cursor-pointer" onClick={startNewChat}>
@@ -181,7 +191,7 @@ const ChatPage = () => {
                         <div className="text-gray-500 mx-1 p-1">No history</div>
                     }
                     <div className="absolute bottom-0 text-sm w-4/5">
-                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1 cursor-pointer">
+                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1 cursor-pointer" onClick={() => setSettings(true)}>
                         <div className="w-[30px] h-[30px] flex items-center justify-center rounded-full bg-gray-200 mr-2">
                           <i className="fa-solid fa-gear text-md"></i>
                         </div>
@@ -251,7 +261,7 @@ const ChatPage = () => {
                                   </>
                                   ) : (
                                   <>
-                                      <Image src="/smile.png" alt="emoji" width={15} height={15}/>
+                                      <Image src="/smile.png" alt="emoji" width={20} height={20}/>
                                   </>
                                   )}
                               </button>
@@ -265,7 +275,7 @@ const ChatPage = () => {
                                   </>
                                   ) : (
                                   <>
-                                      <Image src="/attach.png" alt="file" width={15} height={15} />
+                                      <Image src="/attach.png" alt="file" width={20} height={20} />
                                   </>
                                   )}
                               </button>
@@ -280,7 +290,7 @@ const ChatPage = () => {
                                   </>
                                   ) : (
                                   <>
-                                      <Image src="/send.png" alt="send" width={15} height={15} />
+                                      <Image src="/send.png" alt="send" width={20} height={20} />
                                   </>
                                   )}
                               </button>
