@@ -27,7 +27,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {state == 'home' && <ChatPage></ChatPage>}
+      {state == 'home' && <ChatPage setState={setState}></ChatPage>}
       {state == 'login' && <LoginPage setState={setState}></LoginPage>}
       {state == 'register' && <RegisterPage setState={setState}></RegisterPage>}
     </div>

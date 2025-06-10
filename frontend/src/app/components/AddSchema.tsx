@@ -18,7 +18,7 @@ const AddSchema = ({setAddSchema}:ChildProps) => {
           <button className="p-2 bg-blue-500 cursor-pointer rounded-full text-white min-w-[100px]" onClick={() => setAddSchema(false)}>save</button>
           <i className="fa-solid fa-xmark cursor-pointer text-lg" onClick={handleAddSchema}></i>
         </div>
-        <textarea name="schema" id="realTextarea" placeholder="paste your schema here" className="p-2 border outline-none rounded-xl font-mono"/>
+        <textarea rows="9" name="schema" id="realTextarea" placeholder="paste your schema here" className="p-2 border outline-none rounded-xl font-mono"/>
       </div>
     </div>
   )
