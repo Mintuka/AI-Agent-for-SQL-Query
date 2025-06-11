@@ -6,13 +6,20 @@ import Image from 'next/image';
 import AddSchema from './AddSchema';
 import Settings from './Settings';
 
-const ChatPage = () => {
+type ChildProps = {
+  setState: React.Dispatch<React.SetStateAction<string>>;
+};
+
+const ChatPage = ({setState}:ChildProps) => {
     const [question, setQuestion] = useState('');
     const [selectChat, setSelectChat] = useState<ChatHistory>({session_id: "", title: "", timestamp: 0, history: []});
     const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
     const [loading, setLoading] = useState(false)
     const [isAddSchema, setAddSchema] = useState<boolean>(false)
     const [isSetting, setSettings] = useState<boolean>(false)
+    const [isLiked, setLike] = useState<boolean>(false)
+    const [isDisliked, setDislike] = useState<boolean>(false)
+    const [isCopied, setCopy] = useState<boolean>(false)
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const timerRef = useRef<NodeJS.Timeout[]>([])
 
@@ -144,6 +151,35 @@ const ChatPage = () => {
         })
       }
 
+    const handleLogOut = () => {
+      setState('login')
+      localStorage.removeItem('username')
+      localStorage.removeItem('password')
+    }  
+
+    const handleLike = () => {
+      setLike(!isLiked)
+      setDislike(false)
+    }
+
+    const handleDislike = () => {
+      setDislike(!isDisliked)
+      setLike(false)
+    }
+
+    const CopyToClipboard = (text: string): Promise<void> => {
+      setCopy(true)
+      setTimeout(() => {
+        setCopy(false)
+      },2000)
+      return navigator.clipboard.writeText(text)
+        .then(() => {
+          console.log('Text copied to clipboard');
+        })
+        .catch((err: Error) => {
+          console.error('Failed to copy text: ', err);
+        });
+    }
 
     return (
         <div className="w-full fixed">
@@ -197,6 +233,12 @@ const ChatPage = () => {
                         </div>
                         <span>Settings</span>
                       </div>
+                      <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1 cursor-pointer" onClick={handleLogOut}>
+                        <div className="w-[30px] h-[30px] flex items-center justify-center rounded-full bg-gray-200 mr-2">
+                          <i className="fa-solid fa-arrow-right-from-bracket"></i>
+                        </div>
+                        <span>Log Out</span>
+                      </div>
                       <div className="flex items-center shadow-sm w-full px-4 p-2 rounded-full my-1 cursor-pointer">
                         <Image className="rounded-full mr-2" width={30} height={30} src="/man.png" alt="user"/>
                         <span>Minte Kassa</span>
@@ -224,12 +266,13 @@ const ChatPage = () => {
                                   <p className="text-gray-700 text-justify text-sm dark:text-gray-300 mb-4">{chat.answer}</p>
                                 </div>
                                 <div className="flex items-center justify-between text-sm ml-4">
-                                  <div className="flex p-2 rounded-full bg-white">
-                                    <i className="fa-regular fa-thumbs-up text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
-                                    <i className="fa-regular fa-thumbs-down text-gray-400 cursor-pointer px-2 border-r-1 border-gray-300"></i>
-                                    <i className="fa-regular fa-copy text-gray-400 cursor-pointer mx-2"></i>
+                                  <div className="relative flex p-2 rounded-full bg-white flex items-center justify-center">
+                                    <i className={`fa-regular fa-thumbs-up ${isLiked ? 'text-blue-500' : 'text-gray-400'} cursor-pointer px-2 border-r-1 border-gray-300`} onClick={handleLike}></i>
+                                    <i className={`fa-regular fa-thumbs-down ${isDisliked ? 'text-blue-500' : 'text-gray-400'} cursor-pointer px-2 border-r-1 border-gray-300`} onClick={handleDislike}></i>
+                                    <i className={`fa-regular fa-copy ${isCopied ? 'text-blue-500' : 'text-gray-400'} cursor-pointer mx-2`} onClick={() => CopyToClipboard(chat.answer)}></i>
+                                    {isCopied && <div className="absolute p-1 px-2 bg-white rounded-full text-blue-500 -right-18">Copied!</div>}
                                   </div>
-                                  <div className="flex items-center p-2 bg-white rounded-full cursor-pointer text-sm">
+                                  <div className="flex items-center p-2 bg-white rounded-full cursor-pointer text-sm hover:outline">
                                     <i className="fa-solid fa-rotate text-gray-500 mr-2"></i>
                                     <div className="text-sm text-gray-700">Regenerate</div>
                                   </div>
@@ -247,7 +290,7 @@ const ChatPage = () => {
                             <textarea
                                 value={question}
                                 onChange={(e) => setQuestion(e.target.value)}
-                                placeholder="Ask a question about the content..."
+                                placeholder="Write what you want fetch from the database..."
                                 className="flex-1 border pl-4 pr-9 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg outline-none min-h-[100px] max-h-[200px] resize-y overflow-auto scrollbar-hide"
                             />
                             <div className="absolute right-3 bottom-3 flex items-center justify-center gap-2">
@@ -255,7 +298,7 @@ const ChatPage = () => {
                                   className="cursor-pointer hover:bg-gray-200 text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2"
                                   disabled={loading}
                               >
-                                  {loading ? (
+                                  {false ? (
                                   <>
                                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                                   </>
@@ -266,10 +309,10 @@ const ChatPage = () => {
                                   )}
                               </button>
                               <button
-                                  className="cursor-pointer hover:bg-gray-200 text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2"
+                                  className={`cursor-pointer hover:bg-gray-200 text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2`}
                                   disabled={loading}
                               >
-                                  {loading ? (
+                                  {false ? (
                                   <>
                                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                                   </>
@@ -281,7 +324,7 @@ const ChatPage = () => {
                               </button>
                               <button
                                   type="submit"
-                                  className="cursor-pointer hover:bg-gray-200 text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2"
+                                  className={`cursor-pointer text-white font-semibold px-2 py-2 rounded-full transition-colors flex items-center justify-center gap-2 ${loading ? 'bg-gray-700' : 'hover:bg-gray-200'}`}
                                   disabled={loading}
                               >
                                   {loading ? (
