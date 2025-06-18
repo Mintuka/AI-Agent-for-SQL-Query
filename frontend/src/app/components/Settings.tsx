@@ -16,7 +16,7 @@ const Settings = ({setSettings}:ChildProps) => {
 
   return (
     <div className="fixed z-5 w-full min-h-screen bg-gray-300 opacity-[0.75] flex items-center justify-center">
-        <div className="p-4 bg-white rouned-full w-1/2 flex flex-col rounded-lg">
+        <div className="p-4 bg-white rouned-full w-1/2 flex flex-col rounded-lg opacity-[1]">
             <div className="flex justify-between items-center mb-8">
                 <div className="text-lg font-bold">Settings</div>
                 <i className="fa-solid fa-xmark cursor-pointer text-lg" onClick={() => setSettings(false)}></i>
