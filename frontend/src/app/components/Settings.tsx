@@ -1,13 +1,20 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { settingsOptions } from '../utils/component-utils';
 
 type ChildProps = {
     setSettings: React.Dispatch<React.SetStateAction<boolean>>;
   };
 
 const Settings = ({setSettings}:ChildProps) => {
+    const [apikey, setApikey] = useState('')
 
-    const handleSave = () => {
-        setSettings(false)
+    const handleSave = async() => {
+        const {status} = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/settings`,
+            settingsOptions('POST', apikey)
+        );
+        if (status == 200) {
+            setSettings(false)
+        }
     }
 
     const handleDelete = () => {
@@ -22,7 +29,7 @@ const Settings = ({setSettings}:ChildProps) => {
                 <i className="fa-solid fa-xmark cursor-pointer text-lg" onClick={() => setSettings(false)}></i>
             </div>
             <label htmlFor="apikey" className="mb-2 text-sm">OpenAI API KEY</label>
-            <input type="text" className="border outline-none mb-8 rounded-md p-2"/>
+            <input type="text" className="border outline-none mb-8 rounded-md p-2" value={apikey} onChange={(e) => setApikey(e.target.value)}/>
             <div className="flex justify-between items-center">
                 <button className="bg-blue-500 px-6 py-1 rounded-full text-white cursor-pointer hover:bg-blue-700" onClick={handleSave}>save</button>
                 <button className="bg-red-500 px-6 py-1 rounded-full text-white cursor-pointer hover:bg-red-700" onClick={handleDelete}>delete</button>

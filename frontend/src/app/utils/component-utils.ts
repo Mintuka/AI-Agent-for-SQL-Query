@@ -22,3 +22,14 @@ export const getFetchOptions = (method: string, question: string, session_id: st
     }),
     mode: 'cors' as RequestMode,
 });
+
+export const settingsOptions = (method: string, apikey: string) => ({
+  method,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    apikey,
+  }),
+  mode: 'cors' as RequestMode,
+});
