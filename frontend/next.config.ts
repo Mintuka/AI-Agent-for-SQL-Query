@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
-import type { WebpackConfigContext } from 'next/dist/server/config-shared';
 
 const nextConfig: NextConfig = {
-  webpackDevMiddleware: (config: WebpackConfigContext['webpack']) => {
+  webpack: (config) => {
     config.watchOptions = {
       poll: 1000,
       aggregateTimeout: 300,

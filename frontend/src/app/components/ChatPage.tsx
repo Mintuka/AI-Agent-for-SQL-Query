@@ -26,7 +26,7 @@ const ChatPage = ({setState}:ChildProps) => {
     useEffect(() => {
       document.getElementById(`title-${selectChat?.session_id}`)
       console.log('his', chatHistory)
-    },[chatHistory])
+    },[chatHistory, selectChat?.session_id])
 
     // useEffect(() => {
     //   return () => {
