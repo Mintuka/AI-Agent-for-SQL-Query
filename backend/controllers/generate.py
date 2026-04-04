@@ -1,19 +1,289 @@
-import bs4
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_chroma import Chroma
-from chromadb.config import Settings as ChromaSettings
 from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_openai import OpenAI, OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_google_genai import ChatGoogleGenerativeAI
 from flask import jsonify
+from dotenv import load_dotenv
+import re
 import uuid
 import os
 
+load_dotenv()
+
 chat_history_store = {}
+schema_cache = {"ts": 0.0, "schema_summary": ""}
+SCHEMA_CACHE_TTL_SEC = 60 * 30  # refresh schema every 30 minutes
+
+
+def _get_postgres_url() -> str | None:
+    url = os.environ.get("POSTGRES_URL")
+    if not url:
+        return None
+    return _normalize_postgres_url(url)
+
+
+def _normalize_postgres_url(url: str) -> str:
+    """
+    Accept Prisma-style Postgres URLs and try to convert them into a
+    libpq/psycopg2-compatible URI.
+
+    Note: If your Prisma Accelerate URL still can't be used by psycopg2,
+    you must provide a direct `postgresql://user:pass@host:port/dbname` URL.
+    """
+    u = url.strip().strip('"').strip("'")
+
+    # Prisma uses a non-standard scheme prefix for Postgres connections.
+    if u.startswith("prisma+postgres://"):
+        u = "postgresql://" + u[len("prisma+postgres://") :]
+    if u.startswith("prisma://"):
+        # Best-effort normalization. Some Prisma URLs may require Prisma-specific auth.
+        u = "postgresql://" + u[len("prisma://") :]
+
+    # psycopg2/libpq does not understand Prisma `api_key` query params.
+    # If present, you need a direct connection string.
+    if "api_key=" in u:
+        raise ValueError(
+            "POSTGRES_URL appears to be a Prisma Accelerate URL (contains `api_key`). "
+            "psycopg2 can't use it. Please set POSTGRES_URL to a direct "
+            "`postgresql://user:pass@host:port/dbname` connection string (no `prisma+` / no `api_key`)."
+        )
+
+    return u
+
+
+def _fetch_db_schema_summary(max_tables: int = 25) -> str:
+    """
+    Best-effort schema context so the model can generate valid SQL.
+    Keeps prompts smaller by summarizing only a subset of public tables.
+    """
+    import psycopg2
+
+    postgres_url = _get_postgres_url()
+    if not postgres_url:
+        return ""
+
+    schema_sql = """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+        ORDER BY table_name
+        LIMIT %s
+    """
+    columns_sql = """
+        SELECT table_name, column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = ANY(%s)
+        ORDER BY table_name, ordinal_position
+    """
+
+    try:
+        conn = psycopg2.connect(postgres_url)
+    except Exception as e:
+        raise ValueError(
+            "Failed to connect to Postgres using POSTGRES_URL. "
+            "If you're using a Prisma Accelerate URL like `prisma+postgres://...`, "
+            "psycopg2 may not support it. Provide a direct "
+            "`postgresql://user:pass@host:port/dbname` connection string."
+        ) from e
+    try:
+        with conn.cursor() as cur:
+            cur.execute(schema_sql, (max_tables,))
+            tables = [r[0] for r in cur.fetchall()]
+            if not tables:
+                return ""
+
+            cur.execute(columns_sql, (tables,))
+            cols_by_table: dict[str, list[str]] = {}
+            for table_name, column_name, data_type in cur.fetchall():
+                cols_by_table.setdefault(table_name, []).append(
+                    f"{column_name} ({data_type})"
+                )
+
+        lines: list[str] = []
+        for t in tables:
+            cols = cols_by_table.get(t, [])
+            if cols:
+                lines.append(f"- {t}: {', '.join(cols[:40])}")
+            else:
+                lines.append(f"- {t}: (no columns found)")
+        return "\n".join(lines)
+    finally:
+        conn.close()
+
+
+def get_db_schema_summary() -> str:
+    """
+    Cached schema summary to reduce repeated schema introspection.
+    """
+    import time
+
+    now = time.time()
+    if schema_cache["schema_summary"] and (now - schema_cache["ts"]) < SCHEMA_CACHE_TTL_SEC:
+        return schema_cache["schema_summary"]
+
+    summary = _fetch_db_schema_summary()
+    schema_cache["schema_summary"] = summary
+    schema_cache["ts"] = now
+    return summary
+
+
+def _extract_sql_and_explanation(model_text: str) -> tuple[str, str]:
+    text = model_text.strip()
+
+    # Prefer ```sql ... ``` code blocks.
+    code_match = re.search(r"```sql\\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
+    if not code_match:
+        # Fallback to any fenced code block.
+        code_match = re.search(r"```\\s*(.*?)```", text, flags=re.DOTALL)
+
+    sql = code_match.group(1).strip() if code_match else ""
+
+    # Extract "Explanation:" section if present.
+    exp_match = re.search(r"Explanation\\s*:\\s*(.*)$", text, flags=re.DOTALL | re.IGNORECASE)
+    explanation = exp_match.group(1).strip() if exp_match else ""
+
+    if not sql:
+        # Last resort: try to find first SELECT statement.
+        select_match = re.search(r"\\b(SELECT\\b[\\s\\S]*)", text, flags=re.IGNORECASE)
+        sql = select_match.group(1).strip() if select_match else text
+
+    if not explanation:
+        explanation = text
+
+    # Drop any trailing "Explanation:" markers or extra content after the explanation.
+    return sql, explanation
+
+
+def _json_safe(v):
+    # psycopg returns datetime/decimal/etc; convert non-basic types to string.
+    if v is None:
+        return None
+    if isinstance(v, (bool, int, float, str)):
+        return v
+    return str(v)
+
+
+def _enforce_readonly_sql(sql: str) -> str:
+    """
+    Basic guardrails to prevent executing non-SELECT statements.
+    This is not perfect SQL sanitization, but it blocks common destructive keywords.
+    """
+    q = sql.strip()
+    if not q:
+        raise ValueError("Model did not return any SQL.")
+
+    # Reject multi-statement payloads.
+    # (Allowing semicolons can enable "SELECT ...; DELETE ..." style attacks.)
+    if ";" in q:
+        raise ValueError("SQL must not contain ';' characters (single statement only).")
+
+    q_lower = q.lower()
+    if not (q_lower.startswith("select") or q_lower.startswith("with")):
+        raise ValueError("Only SELECT (or WITH ... SELECT) queries are allowed.")
+
+    # SELECT INTO creates/overwrites tables in Postgres.
+    if re.search(r"\bselect\b[\s\S]*\binto\b", q_lower):
+        raise ValueError("SELECT INTO is not allowed (read-only queries only).")
+
+    forbidden = [
+        "insert",
+        "update",
+        "delete",
+        "drop",
+        "alter",
+        "create",
+        "truncate",
+        "grant",
+        "revoke",
+        "comment",
+        "call",
+        "do ",
+        "copy ",
+        "vacuum",
+    ]
+    for kw in forbidden:
+        if re.search(rf"\\b{re.escape(kw)}\\b", q_lower):
+            raise ValueError(f"Forbidden SQL keyword detected: {kw}")
+
+    return q
+
+
+def _add_limit_if_missing(sql: str, limit_rows: int) -> str:
+    if re.search(r"\\blimit\\b", sql, flags=re.IGNORECASE):
+        return sql
+    # Wrap the query so we can safely apply a LIMIT without rewriting the query body.
+    return f"SELECT * FROM ({sql}) AS sub LIMIT {limit_rows}"
+
+
+def execute_postgres_readonly(sql: str, limit_rows: int = 50) -> dict:
+    import psycopg2
+
+    postgres_url = _get_postgres_url()
+    if not postgres_url:
+        raise ValueError("Missing POSTGRES_URL in backend/.env")
+
+    sql_readonly = _enforce_readonly_sql(sql)
+    sql_to_run = _add_limit_if_missing(sql_readonly, limit_rows)
+
+    try:
+        conn = psycopg2.connect(postgres_url)
+    except Exception as e:
+        raise ValueError(
+            "Failed to connect to Postgres using POSTGRES_URL. "
+            "If you're using a Prisma Accelerate URL like `prisma+postgres://...`, "
+            "psycopg2 may not support it. Provide a direct "
+            "`postgresql://user:pass@host:port/dbname` connection string."
+        ) from e
+    try:
+        # Server-side enforcement: even if we miss a keyword, Postgres will reject writes.
+        conn.set_session(readonly=True, autocommit=True)
+        with conn.cursor() as cur:
+            # Safety timeout in ms.
+            cur.execute("SET statement_timeout = %s", (5000,))
+            cur.execute(sql_to_run)
+            cols = [desc[0] for desc in cur.description] if cur.description else []
+            rows = cur.fetchmany(limit_rows) if cur.description else []
+
+        row_dicts = [{cols[i]: _json_safe(row[i]) for i in range(len(cols))} for row in rows]
+        return {"columns": cols, "rows": row_dicts}
+    finally:
+        conn.close()
+
+def get_llm():
+    # Allow overriding the Gemini model without code changes.
+    # Set `GEMINI_MODEL` in `backend/.env` to a model you have access to.
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    return ChatGoogleGenerativeAI(
+        model=model_name,
+        google_api_key=os.environ.get('GEMINI_API_KEY'),
+        temperature=0.3,
+        convert_system_message_to_human=True,
+    )
+
+def build_chain(system_prompt: str):
+    llm = get_llm()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ]
+    )
+
+    chain = prompt | llm
+
+    return RunnableWithMessageHistory(
+        chain,
+        get_session_history,
+        input_messages_key="input",
+        history_messages_key="chat_history",
+    )
+
+def get_session_history(session_id: str) -> ChatMessageHistory:
+    if session_id not in chat_history_store:
+        chat_history_store[session_id] = ChatMessageHistory()
+    return chat_history_store[session_id]
 
 def generate_answer(data):
     question = data.get("question", "").strip()
@@ -22,85 +292,69 @@ def generate_answer(data):
         return jsonify({"error": "Question cannot be empty"}), 400
 
     try:
-        print(os.environ.get('OPENAI_API_KEY'))
-        llm = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-    
-        loader = WebBaseLoader(
-            web_paths=("https://lilianweng.github.io/posts/2023-06-23-agent/",),
-            bs_kwargs=dict(
-                parse_only=bs4.SoupStrainer(
-                    class_=("post-content", "post-title", "post-header")
-                )
-            ),
-        )
-        docs = loader.load()
+        if not os.environ.get("GEMINI_API_KEY"):
+            return jsonify({"error": "Missing GEMINI_API_KEY. Please set it via /settings."}), 400
 
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        splits = text_splitter.split_documents(docs)
-        vectorstore = Chroma.from_documents(
-            documents=splits,
-            embedding=OpenAIEmbeddings(),
-            client_settings=ChromaSettings(tenant_id="default_tenant")
-        )
+        postgres_url = _get_postgres_url()
+        if not postgres_url:
+            return jsonify({"error": "Missing POSTGRES_URL in backend/.env"}), 400
 
-        retriever = vectorstore.as_retriever()
+        schema_summary = get_db_schema_summary()
 
-
-        ### Contextualize question ###
-        contextualize_q_system_prompt = """Given a chat history and the latest user question \
-        which might reference context in the chat history, formulate a standalone question \
-        which can be understood without the chat history. Do NOT answer the question, \
-        just reformulate it if needed and otherwise return it as is."""
-        contextualize_q_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", contextualize_q_system_prompt),
-                MessagesPlaceholder("chat_history"),
-                ("human", "{input}"),
-            ]
-        )
-        history_aware_retriever = create_history_aware_retriever(
-            llm, retriever, contextualize_q_prompt
+        system_prompt = (
+            "You are GenSQL, an expert PostgreSQL SQL assistant.\n\n"
+            "You must write a single READ-ONLY SQL query that answers the user's question.\n\n"
+            "Schema (use only these tables/columns when possible):\n"
+            f"{schema_summary if schema_summary else '(no schema available; try best-effort using common names)'}\n\n"
+            "Output format (MUST follow exactly):\n"
+            "SQL:\n"
+            "```sql\n"
+            "<one SELECT or WITH ... SELECT query>\n"
+            "```\n\n"
+            "Explanation:\n"
+            "<short explanation>\n\n"
+            "Constraints:\n"
+            "- SQL must be SELECT or WITH ... SELECT only.\n"
+            "- No INSERT/UPDATE/DELETE/DDL.\n"
+            "- Never use `SELECT ... INTO` (it creates tables).\n"
+            "- No data-modifying CTEs (DELETE/UPDATE in subqueries).\n"
+            "- Do not use functions/clauses that can cause side effects (no CALL/DO/COPY).\n"
+            "- Prefer PostgreSQL dialect.\n"
+            "- Include LIMIT (<=50) when you expect many rows.\n"
         )
 
-        ### Answer question ###
-        qa_system_prompt = """You are an assistant for question-answering tasks. \
-        Use the following pieces of retrieved context to answer the question. \
-        If you don't know the answer, just say that you don't know. \
+        # Rebuild the chain per request so dynamic prompt + /settings changes take effect immediately.
+        conversational_chain = build_chain(system_prompt)
 
-        {context}"""
-        qa_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", qa_system_prompt),
-                MessagesPlaceholder("chat_history"),
-                ("human", "{input}"),
-            ]
-        )
-        question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
-
-        rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
-
-        conversational_rag_chain = RunnableWithMessageHistory(
-            rag_chain,
-            get_session_history,
-            input_messages_key="input",
-            history_messages_key="chat_history",
-            output_messages_key="answer",
-        )
-
-        qa_chain = conversational_rag_chain
-
-        if session_id not in chat_history_store:
+        if not session_id or session_id not in chat_history_store:
             session_id = str(uuid.uuid4())
-        answer = qa_chain.invoke(
+
+        result = conversational_chain.invoke(
             {"input": question},
             config={"configurable": {"session_id": session_id}}
-        )["answer"]
-        return jsonify({"success": True, "answer": answer, "session_id": session_id})
+        )
+
+        model_text = result.content if hasattr(result, "content") else str(result)
+        sql, explanation = _extract_sql_and_explanation(model_text)
+
+        try:
+            results = execute_postgres_readonly(sql, limit_rows=50)
+        except Exception as exec_err:
+            # Still return the generated SQL + explanation even if execution fails.
+            results = {"error": str(exec_err)}
+
+        # Keep `answer` for backwards-compat with the frontend, but prefer `explanation/results/sql`.
+        answer = explanation
+        return jsonify(
+            {
+                "success": True,
+                "session_id": session_id,
+                "answer": answer,
+                "sql": sql,
+                "explanation": explanation,
+                "results": results,
+            }
+        )
     except Exception as e:
-        print('err',e)
+        print('err', e)
         return jsonify({"error": str(e)}), 500
-    
-def get_session_history(session_id: str) -> ChatMessageHistory:
-    if session_id not in chat_history_store:
-        chat_history_store[session_id] = ChatMessageHistory()
-    return chat_history_store[session_id]

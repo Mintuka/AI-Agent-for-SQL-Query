@@ -1,11 +1,12 @@
 from controllers.generate import generate_answer
 from controllers.login import login_user
 from controllers.register import register_user
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from flask_cors import CORS
 from flask import Flask, request, jsonify
 from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
+import certifi
 import os
 
 load_dotenv()
@@ -21,10 +22,7 @@ CORS(
     expose_headers=["Content-Type"]
 )
 
-app = Flask(__name__)
-bcrypt = Bcrypt(app)
-# Connect to MongoDB (adjust the URI as needed)
-client = MongoClient(os.environ.get('MONGODB_URL'))
+client = MongoClient(os.environ.get('MONGODB_URL'), tlsCAFile=certifi.where())
 db = client['querygpt']
 users_collection = db['users']
 
@@ -70,6 +68,33 @@ def generate():
     data = request.get_json() or {}
     return generate_answer(data)
 
+@app.route('/settings', methods=['POST', 'OPTIONS'])
+def settings():
+    # Needed so the browser CORS preflight doesn't fail with a 404.
+    if request.method == "OPTIONS":
+        return '', 204
+
+    data = request.get_json() or {}
+    apikey = str(data.get("apikey", "")).strip()
+    if not apikey:
+        return jsonify({"error": "Missing apikey"}), 400
+    # Basic sanity check to avoid accidentally saving HTML/CORS error text as the key.
+    if "AIza" not in apikey:
+        return jsonify({"error": "Invalid apikey format"}), 400
+
+    # Update runtime config immediately.
+    os.environ["GEMINI_API_KEY"] = apikey
+
+    # Persist so it survives restarts.
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        set_key(env_path, "GEMINI_API_KEY", apikey)
+    except Exception:
+        # If writing fails for any reason, runtime config is still updated.
+        pass
+
+    return jsonify({"success": True}), 200
+
 @app.route('/documents', methods=['GET'])
 def get_documents():
     docs = list(users_collection.find({}, {'_id': 0}))
@@ -89,7 +114,7 @@ def format_docs(docs):
     return "\n\n".join([d.page_content for d in docs])
 
 def setup_rag():
-    print('api',os.environ.get('OPENAI_API_KEY'))
+    print('api',os.environ.get('GEMINI_API_KEY'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)

@@ -2,7 +2,7 @@ python-dotenv
 flask
 flask-cors
 langchain
-langchain-openai
+langchain-google-genai
 langchain-community
 langchain_chroma
 langchain_core
@@ -11,3 +11,4 @@ requests
 bs4
 pymongo
 flask-bcrypt
+psycopg2-binary
