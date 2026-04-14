@@ -1,9 +1,43 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Virtual environments
+venv/
+.venv/
+env/
 
-# env files (can opt-in for committing if needed)
-.env*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-# vercel
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Testing & type checking
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Environment (secrets)
+.env
+.env.*
+
+# Flask / local
+instance/
+.webassets-cache
+
+# Editor & OS
+.DS_Store
+.idea/
+*.swp
+*.swo
+
+# Vercel (if used)
 .vercel
-
-*.cpython*

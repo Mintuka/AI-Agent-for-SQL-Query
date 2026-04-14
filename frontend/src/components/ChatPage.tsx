@@ -19,7 +19,6 @@ const ChatPage = ({ setState }: ChildProps) => {
     const [isDisliked, setDislike] = useState<boolean>(false)
     const [isCopied, setCopy] = useState<boolean>(false)
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const timerRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
     useEffect(() => {
       console.log('his', chatHistory)
@@ -27,7 +26,7 @@ const ChatPage = ({ setState }: ChildProps) => {
 
     const formatResults = (results: any) => {
       if (!results) return ''
-      if (results.error) return `Execution failed: ${results.error}`
+      if (results.error) return ''
       if (!Array.isArray(results.rows)) return ''
       const columns: string[] = results.columns || []
       const rows: any[] = results.rows
@@ -40,6 +39,27 @@ const ChatPage = ({ setState }: ChildProps) => {
           return `${idx + 1}. ${parts.join(', ')}`
         })
         .join('\n')
+    }
+
+    const buildResultSummary = (explanation: string, results: any) => {
+      if (results?.error) {
+        return `Execution failed: ${results.error}`
+      }
+      const n = Array.isArray(results?.rows) ? results.rows.length : 0
+      const countLine = `There are ${n} row${n === 1 ? '' : 's'} returned.`
+      const exp = (explanation || '').trim()
+      return exp ? `${countLine}\n\n${exp}` : countLine
+    }
+
+    const chatCopyText = (chat: Chat) => {
+      if (chat.sql || chat.resultSummary) {
+        const parts: string[] = []
+        if (chat.sql) parts.push(`Query\n${chat.sql.trim()}`)
+        if (chat.resultSummary) parts.push(`Result\n${chat.resultSummary}`)
+        if (chat.resultDetails) parts.push(chat.resultDetails)
+        return parts.join('\n\n')
+      }
+      return chat.answer
     }
 
     useEffect(() => {
@@ -56,35 +76,6 @@ const ChatPage = ({ setState }: ChildProps) => {
 
     const handleSelectChat = (session: ChatHistory) => {
       setSelectChat({ ...session })
-    }
-
-    const handleResponseGeneration = (answer: string) => {
-      const responseWords = answer.split(' ')
-      responseWords.forEach((word, index) => {
-        const timer = setTimeout(() => {
-          setSelectChat((prevChat: ChatHistory) => {
-            const lastChatIndex = prevChat.history.length - 1;
-            const updatedHistory = [...prevChat.history];
-
-            if (index === 0) {
-              updatedHistory[lastChatIndex] = {
-                ...updatedHistory[lastChatIndex],
-                answer: word
-              };
-            } else {
-              updatedHistory[lastChatIndex] = {
-                ...updatedHistory[lastChatIndex],
-                answer: `${updatedHistory[lastChatIndex]?.answer} ${word}`
-              };
-            }
-            return {
-              ...prevChat,
-              history: updatedHistory
-            }
-          });
-        }, 100 * index)
-        timerRef.current.push(timer)
-      });
     }
 
     const handleAskQuestion = async (e: React.FormEvent) => {
@@ -105,8 +96,16 @@ const ChatPage = ({ setState }: ChildProps) => {
 
         const { explanation, sql, results, session_id } = await response.json();
 
-        const resultsText = formatResults(results)
-        const finalAnswer = `${explanation || ''}\n\nSQL:\n${sql || ''}\n\nResults:\n${resultsText}`.trim()
+        const sqlClean = (sql || '').trim().replace(/;+\s*$/g, '')
+        const resultDetails = formatResults(results)
+        const resultSummary = buildResultSummary(explanation, results)
+        const newChat: Chat = {
+          question: question.trim(),
+          answer: '',
+          sql: sqlClean || undefined,
+          resultSummary,
+          resultDetails: resultDetails || undefined,
+        }
 
         const timestamp = Date.now()
         let newTitle = ''
@@ -120,27 +119,18 @@ const ChatPage = ({ setState }: ChildProps) => {
         if (selectChat?.session_id) {
           newSessions = newSessions.map(session => {
             if (session.session_id == session_id) {
-              currentSession = { ...session, history: [...session.history, { question: question.trim(), answer: finalAnswer }] }
+              currentSession = { ...session, history: [...session.history, newChat] }
               return currentSession
             }
             return { ...session }
           })
         } else {
-          currentSession = { session_id, timestamp, title: newTitle, history: [{ question: question.trim(), answer: finalAnswer }] }
+          currentSession = { session_id, timestamp, title: newTitle, history: [newChat] }
           newSessions = [...newSessions, currentSession]
         }
         newSessions.sort((a, b) => b.timestamp - a.timestamp)
         setChatHistory(() => newSessions)
-        const oldHistory: Chat[] = currentSession.history.map((chat: Chat, index: number) => {
-          const lastIndex = currentSession.history.length - 1
-          if (lastIndex == index) {
-            return { ...chat, answer: '' }
-          }
-          return chat
-        })
-        currentSession = { ...currentSession, history: oldHistory }
         setSelectChat(() => currentSession)
-        handleResponseGeneration(finalAnswer)
       } catch (error) {
         console.log(error)
       } finally {
@@ -298,7 +288,43 @@ const ChatPage = ({ setState }: ChildProps) => {
                             <img src="/chatbot.png" className="w-5 h-5" alt="chatbot" />
                             <span className="text-sm font-medium">GenSQL</span>
                           </div>
-                          <p className="text-sm leading-relaxed text-justify" style={{ color: 'var(--color-text-secondary)' }}>{chat.answer}</p>
+                          {chat.sql || chat.resultSummary ? (
+                            <div className="space-y-4 text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                              {chat.sql ? (
+                                <div>
+                                  <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-primary)' }}>Query</div>
+                                  <pre
+                                    className="p-3 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap break-words font-mono border"
+                                    style={{
+                                      background: 'var(--color-bg-input)',
+                                      borderColor: 'var(--color-border)',
+                                      color: 'var(--color-text-primary)',
+                                    }}
+                                  >
+                                    {chat.sql}
+                                  </pre>
+                                </div>
+                              ) : null}
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-primary)' }}>Result</div>
+                                <p className="whitespace-pre-wrap" style={{ color: 'var(--color-text-secondary)' }}>{chat.resultSummary}</p>
+                                {chat.resultDetails ? (
+                                  <pre
+                                    className="mt-3 p-3 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap break-words font-mono border"
+                                    style={{
+                                      background: 'var(--color-bg-input)',
+                                      borderColor: 'var(--color-border)',
+                                      color: 'var(--color-text-muted)',
+                                    }}
+                                  >
+                                    {chat.resultDetails}
+                                  </pre>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm leading-relaxed text-justify" style={{ color: 'var(--color-text-secondary)' }}>{chat.answer}</p>
+                          )}
                         </div>
                         {/* Action bar */}
                         <div className="flex items-center justify-between text-sm ml-2 mt-2">
@@ -311,7 +337,7 @@ const ChatPage = ({ setState }: ChildProps) => {
                               <i className="fa-regular fa-thumbs-down"></i>
                             </button>
                             <div className="w-px h-4" style={{ background: 'var(--color-border)' }}></div>
-                            <button className="relative p-1.5 rounded-md cursor-pointer" style={{ color: isCopied ? 'var(--color-primary)' : 'var(--color-text-muted)' }} onClick={() => CopyToClipboard(chat.answer)}>
+                            <button className="relative p-1.5 rounded-md cursor-pointer" style={{ color: isCopied ? 'var(--color-primary)' : 'var(--color-text-muted)' }} onClick={() => CopyToClipboard(chatCopyText(chat))}>
                               <i className="fa-regular fa-copy"></i>
                               {isCopied && <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs px-2 py-1 rounded-md whitespace-nowrap" style={{ background: 'var(--color-primary)', color: 'var(--color-text-on-primary)' }}>Copied!</span>}
                             </button>

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { settingsOptions } from '../utils/component-utils'
+import { useState, useEffect } from 'react'
+import { settingsLoadOptions, settingsOptions } from '../utils/component-utils'
 
 type ChildProps = {
   setSettings: React.Dispatch<React.SetStateAction<boolean>>;
@@ -7,10 +7,34 @@ type ChildProps = {
 
 const Settings = ({ setSettings }: ChildProps) => {
   const [apikey, setApikey] = useState('')
+  const [dbApiKey, setDbApiKey] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      const email = localStorage.getItem('username') ?? ''
+      const password = localStorage.getItem('password') ?? ''
+      if (!email || !password) return
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/settings/load`,
+          settingsLoadOptions(email, password)
+        )
+        if (!res.ok) return
+        const data = await res.json() as { gemini_api_key?: string; db_api_key?: string }
+        setApikey(data.gemini_api_key ?? '')
+        setDbApiKey(data.db_api_key ?? '')
+      } catch {
+        /* ignore */
+      }
+    }
+    void load()
+  }, [])
 
   const handleSave = async () => {
+    const email = localStorage.getItem('username') ?? ''
+    const password = localStorage.getItem('password') ?? ''
     const { status } = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings`,
-      settingsOptions('POST', apikey)
+      settingsOptions('POST', apikey, dbApiKey, email, password)
     );
     if (status == 200) {
       setSettings(false)
@@ -30,11 +54,21 @@ const Settings = ({ setSettings }: ChildProps) => {
         <input
           type="password"
           id="apikey"
-          className="w-full border outline-none mb-6 rounded-lg p-2.5 text-sm"
+          className="w-full border outline-none mb-4 rounded-lg p-2.5 text-sm"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', background: 'var(--color-bg-input)' }}
           placeholder="Enter your API key"
           value={apikey}
           onChange={(e) => setApikey(e.target.value)}
+        />
+        <label htmlFor="dbapikey" className="block mb-2 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>DB API Key</label>
+        <input
+          type="password"
+          id="dbapikey"
+          className="w-full border outline-none mb-6 rounded-lg p-2.5 text-sm"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', background: 'var(--color-bg-input)' }}
+          placeholder="Enter your database API key"
+          value={dbApiKey}
+          onChange={(e) => setDbApiKey(e.target.value)}
         />
         <div className="flex justify-end gap-3">
           <button

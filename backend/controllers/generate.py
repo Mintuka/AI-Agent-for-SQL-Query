@@ -11,8 +11,8 @@ import os
 load_dotenv()
 
 chat_history_store = {}
-schema_cache = {"ts": 0.0, "schema_summary": ""}
-SCHEMA_CACHE_TTL_SEC = 60 * 30  # refresh schema every 30 minutes
+schema_cache = {"ts": 0.0, "context": ""}
+SCHEMA_CACHE_TTL_SEC = 60 * 30  # refresh schema + samples every 30 minutes
 
 
 def _get_postgres_url() -> str | None:
@@ -51,107 +51,109 @@ def _normalize_postgres_url(url: str) -> str:
     return u
 
 
-def _fetch_db_schema_summary(max_tables: int = 25) -> str:
+def get_db_schema_context() -> str:
     """
-    Best-effort schema context so the model can generate valid SQL.
-    Keeps prompts smaller by summarizing only a subset of public tables.
-    """
-    import psycopg2
-
-    postgres_url = _get_postgres_url()
-    if not postgres_url:
-        return ""
-
-    schema_sql = """
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = 'public'
-        ORDER BY table_name
-        LIMIT %s
-    """
-    columns_sql = """
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = ANY(%s)
-        ORDER BY table_name, ordinal_position
-    """
-
-    try:
-        conn = psycopg2.connect(postgres_url)
-    except Exception as e:
-        raise ValueError(
-            "Failed to connect to Postgres using POSTGRES_URL. "
-            "If you're using a Prisma Accelerate URL like `prisma+postgres://...`, "
-            "psycopg2 may not support it. Provide a direct "
-            "`postgresql://user:pass@host:port/dbname` connection string."
-        ) from e
-    try:
-        with conn.cursor() as cur:
-            cur.execute(schema_sql, (max_tables,))
-            tables = [r[0] for r in cur.fetchall()]
-            if not tables:
-                return ""
-
-            cur.execute(columns_sql, (tables,))
-            cols_by_table: dict[str, list[str]] = {}
-            for table_name, column_name, data_type in cur.fetchall():
-                cols_by_table.setdefault(table_name, []).append(
-                    f"{column_name} ({data_type})"
-                )
-
-        lines: list[str] = []
-        for t in tables:
-            cols = cols_by_table.get(t, [])
-            if cols:
-                lines.append(f"- {t}: {', '.join(cols[:40])}")
-            else:
-                lines.append(f"- {t}: (no columns found)")
-        return "\n".join(lines)
-    finally:
-        conn.close()
-
-
-def get_db_schema_summary() -> str:
-    """
-    Cached schema summary to reduce repeated schema introspection.
+    Cached schema + one sample row per table (see services.schema_context).
     """
     import time
 
-    now = time.time()
-    if schema_cache["schema_summary"] and (now - schema_cache["ts"]) < SCHEMA_CACHE_TTL_SEC:
-        return schema_cache["schema_summary"]
+    from services.schema_context import build_postgres_llm_schema_context
 
-    summary = _fetch_db_schema_summary()
-    schema_cache["schema_summary"] = summary
+    now = time.time()
+    if schema_cache["context"] and (now - schema_cache["ts"]) < SCHEMA_CACHE_TTL_SEC:
+        return schema_cache["context"]
+
+    url = _get_postgres_url()
+    ctx = build_postgres_llm_schema_context(url, max_tables=25) if url else ""
+    schema_cache["context"] = ctx
     schema_cache["ts"] = now
-    return summary
+    return ctx
 
 
 def _extract_sql_and_explanation(model_text: str) -> tuple[str, str]:
     text = model_text.strip()
 
     # Prefer ```sql ... ``` code blocks.
-    code_match = re.search(r"```sql\\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
+    code_match = re.search(r"```sql\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     if not code_match:
         # Fallback to any fenced code block.
-        code_match = re.search(r"```\\s*(.*?)```", text, flags=re.DOTALL)
+        code_match = re.search(r"```\s*(.*?)```", text, flags=re.DOTALL)
 
     sql = code_match.group(1).strip() if code_match else ""
 
     # Extract "Explanation:" section if present.
-    exp_match = re.search(r"Explanation\\s*:\\s*(.*)$", text, flags=re.DOTALL | re.IGNORECASE)
+    exp_match = re.search(r"Explanation\s*:\s*(.*)$", text, flags=re.DOTALL | re.IGNORECASE)
     explanation = exp_match.group(1).strip() if exp_match else ""
 
     if not sql:
         # Last resort: try to find first SELECT statement.
-        select_match = re.search(r"\\b(SELECT\\b[\\s\\S]*)", text, flags=re.IGNORECASE)
+        select_match = re.search(r"\b(SELECT\b[\s\S]*)", text, flags=re.IGNORECASE)
         sql = select_match.group(1).strip() if select_match else text
+        cut = re.search(r"\n\s*Explanation\s*:", sql, flags=re.IGNORECASE)
+        if cut:
+            sql = sql[: cut.start()].strip()
 
     if not explanation:
         explanation = text
 
     # Drop any trailing "Explanation:" markers or extra content after the explanation.
+    sql = _normalize_sql_for_execution(sql)
     return sql, explanation
+
+
+def _strip_trailing_semicolons(sql: str) -> str:
+    q = sql.rstrip()
+    while q.endswith(";"):
+        q = q[:-1].rstrip()
+    return q
+
+
+def _first_sql_statement(sql: str) -> str:
+    """
+    Keep a single statement: drop everything after the first top-level ';' (not inside
+    strings or nested parens). Trailing semicolons are removed afterward.
+    """
+    q = sql.strip()
+    q = _strip_trailing_semicolons(q)
+    if not q or ";" not in q:
+        return q
+
+    in_single = False
+    depth = 0
+    i = 0
+    while i < len(q):
+        c = q[i]
+        if in_single:
+            if c == "'":
+                if i + 1 < len(q) and q[i + 1] == "'":
+                    i += 2
+                    continue
+                in_single = False
+            i += 1
+            continue
+        if c == "'":
+            in_single = True
+            i += 1
+            continue
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth = max(0, depth - 1)
+        elif c == ";" and depth == 0:
+            return q[:i].strip()
+        i += 1
+    return _strip_trailing_semicolons(q)
+
+
+def _normalize_sql_for_execution(sql: str) -> str:
+    """Trim, strip leading junk semicolons, keep first statement only, no trailing ';'."""
+    q = (sql or "").strip()
+    while q.startswith(";"):
+        q = q[1:].lstrip()
+    if not q:
+        return q
+    q = _first_sql_statement(q)
+    return _strip_trailing_semicolons(q.strip())
 
 
 def _json_safe(v):
@@ -168,12 +170,11 @@ def _enforce_readonly_sql(sql: str) -> str:
     Basic guardrails to prevent executing non-SELECT statements.
     This is not perfect SQL sanitization, but it blocks common destructive keywords.
     """
-    q = sql.strip()
+    q = _normalize_sql_for_execution(sql)
     if not q:
         raise ValueError("Model did not return any SQL.")
 
-    # Reject multi-statement payloads.
-    # (Allowing semicolons can enable "SELECT ...; DELETE ..." style attacks.)
+    # Reject any remaining ';' (e.g. inside unparseable dollar-quoted strings).
     if ";" in q:
         raise ValueError("SQL must not contain ';' characters (single statement only).")
 
@@ -249,27 +250,29 @@ def execute_postgres_readonly(sql: str, limit_rows: int = 50) -> dict:
     finally:
         conn.close()
 
-def get_llm():
+def get_llm(google_api_key: str | None = None):
     # Allow overriding the Gemini model without code changes.
     # Set `GEMINI_MODEL` in `backend/.env` to a model you have access to.
     model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    key = google_api_key or os.environ.get("GEMINI_API_KEY")
     return ChatGoogleGenerativeAI(
         model=model_name,
-        google_api_key=os.environ.get('GEMINI_API_KEY'),
+        google_api_key=key,
         temperature=0.3,
         convert_system_message_to_human=True,
     )
 
-def build_chain(system_prompt: str):
-    llm = get_llm()
+def build_chain(system_prompt: str, google_api_key: str | None = None):
+    llm = get_llm(google_api_key)
 
+    # Use {system_content} so JSON / braces in the schema are not parsed as template fields.
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", system_prompt),
+            ("system", "{system_content}"),
             MessagesPlaceholder("chat_history"),
             ("human", "{input}"),
         ]
-    )
+    ).partial(system_content=system_prompt)
 
     chain = prompt | llm
 
@@ -280,32 +283,60 @@ def build_chain(system_prompt: str):
         history_messages_key="chat_history",
     )
 
+
+def _escape_langchain_template_literals(text: str) -> str:
+    """No-op; schema is bound via ChatPromptTemplate.partial(system_content=...) instead."""
+    return text
+
+
 def get_session_history(session_id: str) -> ChatMessageHistory:
     if session_id not in chat_history_store:
         chat_history_store[session_id] = ChatMessageHistory()
     return chat_history_store[session_id]
 
-def generate_answer(data):
+def _resolve_gemini_api_key(data, users_collection, is_valid):
+    """Prefer per-user key from MongoDB when credentials match; else server env."""
+    key = os.environ.get("GEMINI_API_KEY")
+    if users_collection is None or is_valid is None:
+        return key
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    if not email or not password:
+        return key
+    user = users_collection.find_one({"email": email})
+    if not user or not is_valid(user["password"], password):
+        return key
+    return user.get("gemini_api_key") or key
+
+
+def generate_answer(data, users_collection=None, is_valid=None):
     question = data.get("question", "").strip()
     session_id = data.get("session_id")
     if not question:
         return jsonify({"error": "Question cannot be empty"}), 400
 
     try:
-        if not os.environ.get("GEMINI_API_KEY"):
+        google_api_key = _resolve_gemini_api_key(data, users_collection, is_valid)
+        if not google_api_key:
             return jsonify({"error": "Missing GEMINI_API_KEY. Please set it via /settings."}), 400
 
         postgres_url = _get_postgres_url()
         if not postgres_url:
             return jsonify({"error": "Missing POSTGRES_URL in backend/.env"}), 400
 
-        schema_summary = get_db_schema_summary()
+        schema_context = get_db_schema_context()
+        schema_block = (
+            schema_context
+            if schema_context
+            else "(no schema available; try best-effort using common names)"
+        )
 
         system_prompt = (
             "You are GenSQL, an expert PostgreSQL SQL assistant.\n\n"
             "You must write a single READ-ONLY SQL query that answers the user's question.\n\n"
-            "Schema (use only these tables/columns when possible):\n"
-            f"{schema_summary if schema_summary else '(no schema available; try best-effort using common names)'}\n\n"
+            "Database context (tables, exact column identifiers, sample rows):\n"
+            + schema_block
+            + "\n\n"
             "Output format (MUST follow exactly):\n"
             "SQL:\n"
             "```sql\n"
@@ -321,10 +352,13 @@ def generate_answer(data):
             "- Do not use functions/clauses that can cause side effects (no CALL/DO/COPY).\n"
             "- Prefer PostgreSQL dialect.\n"
             "- Include LIMIT (<=50) when you expect many rows.\n"
+            "- Output exactly one SQL statement in the code block.\n"
+            "- Do not end the SQL with a semicolon; omit trailing ';' entirely.\n"
+            "- For mixed-case or camelCase columns/tables, use double quotes exactly as in the context (e.g. \"createdAt\").\n"
         )
 
         # Rebuild the chain per request so dynamic prompt + /settings changes take effect immediately.
-        conversational_chain = build_chain(system_prompt)
+        conversational_chain = build_chain(system_prompt, google_api_key)
 
         if not session_id or session_id not in chat_history_store:
             session_id = str(uuid.uuid4())

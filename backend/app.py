@@ -66,7 +66,30 @@ def generate():
     if request.method == "OPTIONS":
         return '', 204
     data = request.get_json() or {}
-    return generate_answer(data)
+    return generate_answer(data, users_collection, is_valid)
+
+@app.route('/settings/load', methods=['POST', 'OPTIONS'])
+def settings_load():
+    if request.method == "OPTIONS":
+        return '', 204
+
+    data = request.get_json() or {}
+    email = str(data.get("email", "")).strip()
+    password = str(data.get("password", ""))
+    if not email or not password:
+        return jsonify({"error": "Missing email or password"}), 400
+
+    user = users_collection.find_one({"email": email})
+    if not user or not is_valid(user["password"], password):
+        return jsonify({"error": "Incorrect email or password"}), 400
+
+    return jsonify(
+        {
+            "gemini_api_key": user.get("gemini_api_key") or "",
+            "db_api_key": user.get("db_api_key") or "",
+        }
+    ), 200
+
 
 @app.route('/settings', methods=['POST', 'OPTIONS'])
 def settings():
@@ -76,22 +99,36 @@ def settings():
 
     data = request.get_json() or {}
     apikey = str(data.get("apikey", "")).strip()
-    if not apikey:
-        return jsonify({"error": "Missing apikey"}), 400
-    # Basic sanity check to avoid accidentally saving HTML/CORS error text as the key.
-    if "AIza" not in apikey:
-        return jsonify({"error": "Invalid apikey format"}), 400
+    email = str(data.get("email", "")).strip()
+    password = str(data.get("password", ""))
+    db_api_key_in = data.get("db_api_key")
 
-    # Update runtime config immediately.
-    os.environ["GEMINI_API_KEY"] = apikey
+    if not email or not password:
+        return jsonify({"error": "Missing email or password"}), 400
 
-    # Persist so it survives restarts.
-    try:
-        env_path = os.path.join(os.path.dirname(__file__), ".env")
-        set_key(env_path, "GEMINI_API_KEY", apikey)
-    except Exception:
-        # If writing fails for any reason, runtime config is still updated.
-        pass
+    user = users_collection.find_one({"email": email})
+    if not user or not is_valid(user["password"], password):
+        return jsonify({"error": "Incorrect email or password"}), 400
+
+    updates = {}
+    if apikey:
+        if "AIza" not in apikey:
+            return jsonify({"error": "Invalid apikey format"}), 400
+        updates["gemini_api_key"] = apikey
+        os.environ["GEMINI_API_KEY"] = apikey
+        try:
+            env_path = os.path.join(os.path.dirname(__file__), ".env")
+            set_key(env_path, "GEMINI_API_KEY", apikey)
+        except Exception:
+            pass
+
+    if db_api_key_in is not None:
+        updates["db_api_key"] = str(db_api_key_in).strip()
+
+    if not updates:
+        return jsonify({"error": "Nothing to save"}), 400
+
+    users_collection.update_one({"email": email}, {"$set": updates})
 
     return jsonify({"success": True}), 200
 
