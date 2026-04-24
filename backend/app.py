@@ -16,7 +16,7 @@ bcrypt = Bcrypt(app)
 CORS(
     app,
     supports_credentials=True,
-    origins=["http://localhost:3000", "http://104.154.92.239", "http://104.154.92.239:80","http://104.154.92.239/:1"],  # No port 80 needed
+    origins=["http://localhost:3000", "http://104.154.92.239", "http://104.154.92.239:80","http://104.154.92.239/:1", "https://ai-agent-for-sql-query.vercel.app/"],  # No port 80 needed
     methods=["GET", "POST", "OPTIONS"],  # Explicitly allow OPTIONS
     allow_headers=["Content-Type", "Authorization"],  # Required for credentials
     expose_headers=["Content-Type"]
@@ -34,7 +34,8 @@ def after_request(response):
         "http://127.0.0.1",
         "http://104.154.92.239",
         "http://104.154.92.239:8080",
-        "http://104.154.92.239/:1"
+        "http://104.154.92.239/:1",
+        "https://ai-agent-for-sql-query.vercel.app/"
     ]
 
     if origin and any(origin.startswith(p) for p in allowed_prefixes):
