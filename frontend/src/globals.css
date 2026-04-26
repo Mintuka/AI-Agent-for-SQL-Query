@@ -120,13 +120,3 @@ input:focus, textarea:focus {
   color: var(--color-primary-text);
 }
 
-/* Chat page-only yellow accent theme */
-.chat-theme {
-  --color-primary: #facc15;
-  --color-primary-hover: #eab308;
-  --color-primary-light: #fef3c7;
-  --color-primary-text: #111111;
-  --color-text-on-primary: #111111;
-  --color-text-link: #ca8a04;
-  --color-bg-active: #fef9c3;
-}

@@ -36,12 +36,12 @@ export const LoginPage = ({ setState }: ChildProps) => {
 
   return (
     <div className="flex justify-center items-center min-h-screen">
-      <div className="flex flex-col items-center justify-center w-full max-w-md py-10 px-8 rounded-2xl" style={{ background: 'var(--color-bg-card)', boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)' }}>
-        <div className="text-3xl font-bold mb-2" style={{ color: 'var(--color-primary)' }}>GenSQL</div>
-        <p className="text-sm mb-8" style={{ color: 'var(--color-text-muted)' }}>Sign in to your account</p>
+      <div className="flex flex-col items-center justify-center w-full max-w-md py-10 px-8 rounded-2xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+        <div className="text-3xl font-bold mb-4" style={{ color: 'var(--color-primary)' }}>GenSQL</div>
+        <p className="text-sm mb-16" style={{ color: 'var(--color-text-muted)' }}>Sign in to your account</p>
         <input
           type="text"
-          className="w-full px-4 py-2.5 mb-3 rounded-lg border outline-none text-sm"
+          className="w-full px-4 py-2.5 mb-4 rounded-lg border outline-none text-sm"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', background: 'var(--color-bg-input)' }}
           placeholder="Enter email"
           value={username}
@@ -50,7 +50,7 @@ export const LoginPage = ({ setState }: ChildProps) => {
         />
         <input
           type="password"
-          className="w-full px-4 py-2.5 mb-4 rounded-lg border outline-none text-sm"
+          className="w-full px-4 py-2.5 mb-16 rounded-lg border outline-none text-sm"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', background: 'var(--color-bg-input)' }}
           placeholder="Enter password"
           value={password}
@@ -109,12 +109,12 @@ export const RegisterPage = ({ setState }: ChildProps) => {
 
   return (
     <div className="flex justify-center items-center min-h-screen">
-      <div className="flex flex-col items-center justify-center w-full max-w-md py-10 px-8 rounded-2xl" style={{ background: 'var(--color-bg-card)', boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)' }}>
-        <div className="text-3xl font-bold mb-2" style={{ color: 'var(--color-primary)' }}>GenSQL</div>
-        <p className="text-sm mb-8" style={{ color: 'var(--color-text-muted)' }}>Create your account</p>
+      <div className="flex flex-col items-center justify-center w-full max-w-md py-10 px-8 rounded-2xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+        <div className="text-3xl font-bold mb-4" style={{ color: 'var(--color-primary)' }}>GenSQL</div>
+        <p className="text-sm mb-16" style={{ color: 'var(--color-text-muted)' }}>Create your account</p>
         <input
           type="text"
-          className="w-full px-4 py-2.5 mb-3 rounded-lg border outline-none text-sm"
+          className="w-full px-4 py-2.5 mb-4 rounded-lg border outline-none text-sm"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', background: 'var(--color-bg-input)' }}
           placeholder="Enter email"
           value={username}
@@ -123,7 +123,7 @@ export const RegisterPage = ({ setState }: ChildProps) => {
         />
         <input
           type="password"
-          className="w-full px-4 py-2.5 mb-3 rounded-lg border outline-none text-sm"
+          className="w-full px-4 py-2.5 mb-4 rounded-lg border outline-none text-sm"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', background: 'var(--color-bg-input)' }}
           placeholder="Enter password"
           value={password}
@@ -132,7 +132,7 @@ export const RegisterPage = ({ setState }: ChildProps) => {
         />
         <input
           type="password"
-          className="w-full px-4 py-2.5 mb-4 rounded-lg border outline-none text-sm"
+          className="w-full px-4 py-2.5 mb-16 rounded-lg border outline-none text-sm"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', background: 'var(--color-bg-input)' }}
           placeholder="Confirm password"
           value={confirm}

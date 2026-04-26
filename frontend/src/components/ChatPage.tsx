@@ -70,6 +70,12 @@ const ChatPage = ({ setState }: ChildProps) => {
       setSelectChat({ session_id: '', timestamp: 0, title: '', history: [] })
     }
 
+    const handleClearAll = () => {
+      setChatHistory([])
+      setSelectChat({ session_id: '', timestamp: 0, title: '', history: [] })
+      setQuestion('')
+    }
+
     const handleSelectChat = (session: ChatHistory) => {
       setSelectChat({ ...session })
     }
@@ -173,7 +179,7 @@ const ChatPage = ({ setState }: ChildProps) => {
     }
 
     return (
-      <div className="chat-theme w-full h-screen flex">
+      <div className="w-full h-screen flex">
         {isSetting && <Settings setSettings={setSettings} />}
         <div className="flex w-full">
           {/* Sidebar */}
@@ -195,7 +201,7 @@ const ChatPage = ({ setState }: ChildProps) => {
 
             <div className="flex justify-between text-xs py-2 my-2 border-t border-b" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
               <span>Your Conversations</span>
-              <span className="cursor-pointer font-medium" style={{ color: 'var(--color-text-link)' }}>Clear All</span>
+              <span className="cursor-pointer font-medium" style={{ color: 'var(--color-text-link)' }} onClick={handleClearAll}>Clear All</span>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -248,8 +254,10 @@ const ChatPage = ({ setState }: ChildProps) => {
                 <span>Log Out</span>
               </button>
               <div className="flex items-center px-3 py-2 rounded-lg" style={{ color: 'var(--color-text-primary)' }}>
-                <img className="rounded-full mr-3 w-8 h-8" src="/man.png" alt="user" />
-                <span className="font-medium">{signedInInitial}</span>
+                <div className="rounded-full mr-3 w-8 h-8 flex items-center justify-center" style={{ background: 'var(--color-bg-hover)' }}>
+                  <span className="font-medium">{signedInInitial}</span>
+                </div>
+                <span className="font-medium">{signedInEmail}</span>
               </div>
             </div>
           </div>
@@ -264,8 +272,13 @@ const ChatPage = ({ setState }: ChildProps) => {
                     .map((chat, index) =>
                       <div className="mb-6 max-w-3xl mx-auto" key={index}>
                         {/* User message */}
-                        <div className="flex items-start gap-3 rounded-xl p-3 mb-3" style={{ background: 'var(--color-bg-user-msg)' }}>
-                          <img src="/man.png" className="rounded-full mt-0.5 w-7 h-7" alt="user" />
+                        <div className="flex items-center gap-3 rounded-xl p-3 mb-3" style={{ background: 'var(--color-bg-user-msg)' }}>
+                          <div
+                            className="rounded-full mt-0.5 w-7 h-7 flex items-center justify-center text-xs font-medium border border-black shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
+                            style={{ color: 'var(--color-text-primary)', background: 'var(--color-bg-primary)' }}
+                          >
+                            {signedInInitial}
+                          </div>
                           <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>{chat.question}</p>
                         </div>
                         {/* Bot response */}
@@ -351,16 +364,6 @@ const ChatPage = ({ setState }: ChildProps) => {
                   style={{ background: 'transparent', color: 'var(--color-text-primary)' }}
                 />
                 <div className="absolute right-3 bottom-3 flex items-center gap-1">
-                  <button
-                    type="button"
-                    className="p-2 rounded-lg cursor-pointer"
-                    style={{ color: 'var(--color-text-muted)' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    disabled={loading}
-                  >
-                    <img src="/attach.png" alt="file" className="w-[18px] h-[18px]" />
-                  </button>
                   <button
                     type="submit"
                     className="p-2 rounded-lg cursor-pointer flex items-center justify-center"
