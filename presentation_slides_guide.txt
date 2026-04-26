@@ -127,18 +127,12 @@ Slide 9 - Session and memory behavior
   - Chat continuity exists only while process state remains alive.
 
 Slide 10 - Current limitations and improvement opportunities
-- Security/auth:
-  - Improved: app now uses signed bearer tokens and protected routes verify `Authorization` header.
-  - Remaining gap: token is still in localStorage (better than password storage, but still vulnerable to XSS).
-  - Next hardening: rotate/revoke tokens, enforce stronger secret management, and move to HttpOnly secure cookie sessions.
 - Reliability:
   - No explicit retry/backoff for transient LLM/database failures.
 - Persistence:
   - Chat history is not durably persisted.
 - Product UX:
   - Schema input modal exists but is not deeply integrated into data pipeline.
-- Documentation:
-  - README and implementation details can drift and should be synchronized regularly.
 
 Optional speaker close (30 seconds)
 - GenSQL combines a modern React chat interface with a Flask + LangChain backend to safely translate natural language into real PostgreSQL queries. Its strongest value is fast question-to-insight turnaround with read-only guardrails. Next evolution should focus on auth hardening, durable chat persistence, and production reliability features.

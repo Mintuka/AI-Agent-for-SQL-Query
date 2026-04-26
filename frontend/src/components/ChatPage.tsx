@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Chat, ChatHistory } from '../types/component-types'
 import { getFetchOptions } from '../utils/component-utils'
-import AddSchema from './AddSchema'
 import Settings from './Settings'
 
 type ChildProps = {
@@ -13,12 +12,13 @@ const ChatPage = ({ setState }: ChildProps) => {
     const [selectChat, setSelectChat] = useState<ChatHistory>({ session_id: "", title: "", timestamp: 0, history: [] });
     const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
     const [loading, setLoading] = useState(false)
-    const [isAddSchema, setAddSchema] = useState<boolean>(false)
     const [isSetting, setSettings] = useState<boolean>(false)
     const [isLiked, setLike] = useState<boolean>(false)
     const [isDisliked, setDislike] = useState<boolean>(false)
     const [isCopied, setCopy] = useState<boolean>(false)
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const signedInEmail = localStorage.getItem('username') || ''
+    const signedInInitial = signedInEmail.trim().charAt(0).toUpperCase() || 'U'
 
     useEffect(() => {
       console.log('his', chatHistory)
@@ -65,10 +65,6 @@ const ChatPage = ({ setState }: ChildProps) => {
     useEffect(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
     }, [selectChat]);
-
-    const addSchema = () => {
-      setAddSchema(true)
-    }
 
     const startNewChat = () => {
       setSelectChat({ session_id: '', timestamp: 0, title: '', history: [] })
@@ -178,7 +174,6 @@ const ChatPage = ({ setState }: ChildProps) => {
 
     return (
       <div className="w-full h-screen flex">
-        {isAddSchema && <AddSchema setAddSchema={setAddSchema} />}
         {isSetting && <Settings setSettings={setSettings} />}
         <div className="flex w-full">
           {/* Sidebar */}
@@ -195,15 +190,6 @@ const ChatPage = ({ setState }: ChildProps) => {
               >
                 <i className="fa-solid fa-plus"></i>
                 <span>New Chat</span>
-              </button>
-              <button
-                className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium cursor-pointer border"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                onClick={addSchema}
-              >
-                <i className="fa-solid fa-database"></i>
               </button>
             </div>
 
@@ -263,7 +249,7 @@ const ChatPage = ({ setState }: ChildProps) => {
               </button>
               <div className="flex items-center px-3 py-2 rounded-lg" style={{ color: 'var(--color-text-primary)' }}>
                 <img className="rounded-full mr-3 w-8 h-8" src="/man.png" alt="user" />
-                <span className="font-medium">Minte Kassa</span>
+                <span className="font-medium">{signedInInitial}</span>
               </div>
             </div>
           </div>
