@@ -14,6 +14,48 @@ chat_history_store = {}
 schema_cache = {"ts": 0.0, "context": ""}
 SCHEMA_CACHE_TTL_SEC = 60 * 30  # refresh schema + samples every 30 minutes
 
+SENSITIVE_COLUMN_PATTERNS = [
+    r"^id$",
+    r"_id$",
+    r"password",
+    r"passcode",
+    r"token",
+    r"secret",
+    r"api[_-]?key",
+    r"access[_-]?key",
+    r"refresh[_-]?token",
+]
+
+
+def _is_sensitive_column(col: str) -> bool:
+    c = (col or "").strip().lower()
+    return any(re.search(pattern, c) for pattern in SENSITIVE_COLUMN_PATTERNS)
+
+
+def _sanitize_query_results(results: dict) -> dict:
+    if not isinstance(results, dict):
+        return results
+    if "rows" not in results or "columns" not in results:
+        return results
+
+    columns = results.get("columns") or []
+    rows = results.get("rows") or []
+    safe_columns = [c for c in columns if not _is_sensitive_column(c)]
+    safe_rows = []
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        safe_row = {k: v for k, v in row.items() if not _is_sensitive_column(k)}
+        safe_rows.append(safe_row)
+
+    redacted_count = len(columns) - len(safe_columns)
+    sanitized = {"columns": safe_columns, "rows": safe_rows}
+    if redacted_count > 0:
+        sanitized["redacted"] = True
+        sanitized["redacted_columns_count"] = redacted_count
+    return sanitized
+
 
 def _get_postgres_url() -> str | None:
     url = os.environ.get("POSTGRES_URL")
@@ -373,6 +415,7 @@ def generate_answer(data, users_collection=None, is_valid=None):
 
         try:
             results = execute_postgres_readonly(sql, limit_rows=50)
+            results = _sanitize_query_results(results)
         except Exception as exec_err:
             # Still return the generated SQL + explanation even if execution fails.
             results = {"error": str(exec_err)}

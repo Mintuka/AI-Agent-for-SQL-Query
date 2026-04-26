@@ -11,6 +11,23 @@ from typing import Any
 
 from psycopg2 import sql as psql
 
+SENSITIVE_COLUMN_PATTERNS = [
+    r"^id$",
+    r"_id$",
+    r"password",
+    r"passcode",
+    r"token",
+    r"secret",
+    r"api[_-]?key",
+    r"access[_-]?key",
+    r"refresh[_-]?token",
+]
+
+
+def _is_sensitive_column(col: str) -> bool:
+    c = (col or "").strip().lower()
+    return any(re.search(pattern, c) for pattern in SENSITIVE_COLUMN_PATTERNS)
+
 
 def _pg_quote_ident(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
@@ -122,8 +139,19 @@ def build_postgres_llm_schema_context(postgres_url: str | None, max_tables: int 
                         sample_line = "(no rows yet — use columns only)"
                     else:
                         sample_dict = {
-                            colnames[i]: _json_safe_sample(row[i]) for i in range(len(colnames))
+                            colnames[i]: _json_safe_sample(row[i])
+                            for i in range(len(colnames))
+                            if not _is_sensitive_column(colnames[i])
                         }
+                        if not sample_dict:
+                            sample_line = "(sample redacted for sensitive columns)"
+                            blocks.append(
+                                f"### Table public.{_sql_ident_fragment(t)}\n"
+                                f"Columns for SQL: {col_sql_list}\n"
+                                f"Types: {type_line}\n"
+                                f"Sample row (1): {sample_line}\n"
+                            )
+                            continue
                         sample_line = json.dumps(sample_dict, ensure_ascii=False, default=str)
                         if len(sample_line) > 1200:
                             sample_line = sample_line[:1199] + "…"

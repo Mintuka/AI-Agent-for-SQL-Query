@@ -326,27 +326,6 @@ const ChatPage = ({ setState }: ChildProps) => {
                             <p className="text-sm leading-relaxed text-justify" style={{ color: 'var(--color-text-secondary)' }}>{chat.answer}</p>
                           )}
                         </div>
-                        {/* Action bar */}
-                        <div className="flex items-center justify-between text-sm ml-2 mt-2">
-                          <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: 'var(--color-bg-action-bar)' }}>
-                            <button className="p-1.5 rounded-md cursor-pointer" style={{ color: isLiked ? 'var(--color-primary)' : 'var(--color-text-muted)' }} onClick={handleLike}>
-                              <i className="fa-regular fa-thumbs-up"></i>
-                            </button>
-                            <div className="w-px h-4" style={{ background: 'var(--color-border)' }}></div>
-                            <button className="p-1.5 rounded-md cursor-pointer" style={{ color: isDisliked ? 'var(--color-primary)' : 'var(--color-text-muted)' }} onClick={handleDislike}>
-                              <i className="fa-regular fa-thumbs-down"></i>
-                            </button>
-                            <div className="w-px h-4" style={{ background: 'var(--color-border)' }}></div>
-                            <button className="relative p-1.5 rounded-md cursor-pointer" style={{ color: isCopied ? 'var(--color-primary)' : 'var(--color-text-muted)' }} onClick={() => CopyToClipboard(chatCopyText(chat))}>
-                              <i className="fa-regular fa-copy"></i>
-                              {isCopied && <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs px-2 py-1 rounded-md whitespace-nowrap" style={{ background: 'var(--color-primary)', color: 'var(--color-text-on-primary)' }}>Copied!</span>}
-                            </button>
-                          </div>
-                          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer border" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                            <i className="fa-solid fa-rotate text-xs"></i>
-                            <span className="text-xs">Regenerate</span>
-                          </button>
-                        </div>
                       </div>
                     )
                 }
