@@ -1,27 +1,31 @@
 import { useState, useEffect } from 'react'
 import ChatPage from './components/ChatPage'
 import { LoginPage, RegisterPage } from './components/AuthPage'
-import { loginOptions } from './utils/component-utils'
-
 export default function App() {
   const [state, setState] = useState('loading')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const username = localStorage.getItem('username') || ''
-        const password = localStorage.getItem('password') || ''
-        if (username && password) {
-          const { status } = await fetch(`${import.meta.env.VITE_API_BASE_URL}/login`,
-            loginOptions('POST', username, password))
+        const token = localStorage.getItem('auth_token') || ''
+        if (token) {
+          const { status } = await fetch(`${import.meta.env.VITE_API_BASE_URL}/me`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            mode: 'cors',
+          })
           if (status == 200) {
             setState('home')
             return
           }
         }
+        localStorage.removeItem('auth_token')
         setState('login')
       } catch (err) {
         console.log('auth check error', err)
+        localStorage.removeItem('auth_token')
         setState('login')
       }
     }

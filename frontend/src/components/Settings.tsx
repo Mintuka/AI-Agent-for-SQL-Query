@@ -11,13 +11,12 @@ const Settings = ({ setSettings }: ChildProps) => {
 
   useEffect(() => {
     const load = async () => {
-      const email = localStorage.getItem('username') ?? ''
-      const password = localStorage.getItem('password') ?? ''
-      if (!email || !password) return
+      const token = localStorage.getItem('auth_token') ?? ''
+      if (!token) return
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE_URL}/settings/load`,
-          settingsLoadOptions(email, password)
+          settingsLoadOptions()
         )
         if (!res.ok) return
         const data = await res.json() as { gemini_api_key?: string; db_api_key?: string }
@@ -31,10 +30,8 @@ const Settings = ({ setSettings }: ChildProps) => {
   }, [])
 
   const handleSave = async () => {
-    const email = localStorage.getItem('username') ?? ''
-    const password = localStorage.getItem('password') ?? ''
     const { status } = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings`,
-      settingsOptions('POST', apikey, dbApiKey, email, password)
+      settingsOptions('POST', apikey, dbApiKey)
     );
     if (status == 200) {
       setSettings(false)

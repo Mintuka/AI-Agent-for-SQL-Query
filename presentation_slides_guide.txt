@@ -1,0 +1,144 @@
+GenSQL Presentation Guide (10 Slides)
+
+Slide 1 - What the application is supposed to achieve
+- Project name: GenSQL (AI Agent for SQL Query).
+- Core goal: allow users to ask database questions in plain English and receive:
+  1) a PostgreSQL query,
+  2) a human explanation of what the query does,
+  3) query results preview.
+- Target value:
+  - Reduce SQL learning barrier for non-technical users.
+  - Speed up analytics and reporting workflows.
+  - Provide a chat-style interface instead of manually writing SQL.
+
+Slide 2 - High-level architecture
+- Frontend:
+  - React + TypeScript + Vite app.
+  - Handles authentication screens, chat UI, settings modal, and local chat sessions.
+- Backend:
+  - Flask API with route-based controllers.
+  - Uses LangChain + Google Gemini model to generate SQL.
+  - Uses psycopg2 to execute SQL against PostgreSQL in read-only mode.
+- Storage:
+  - MongoDB stores users (and saved Gemini API key in user document).
+  - In-memory session chat history on backend (not durable).
+- Communication:
+  - Frontend sends HTTP requests to backend endpoints (`/login`, `/register`, `/generate`, `/settings`).
+
+Slide 3 - Frontend architecture and responsibilities
+- `frontend/src/App.tsx`
+  - Manages view states: loading, login, register, home.
+  - Attempts auto-login by validating credentials from localStorage.
+- `frontend/src/components/AuthPage.tsx`
+  - Login/register forms and submission.
+  - Stores `username` + `password` in localStorage after success.
+- `frontend/src/components/ChatPage.tsx`
+  - Main chat experience, sidebar sessions, message rendering, and result formatting.
+  - Sends user question to backend `/generate`.
+- `frontend/src/components/Settings.tsx`
+  - Save/load Gemini API key through backend routes.
+- `frontend/src/utils/component-utils.ts`
+  - Builds fetch options and payloads used by frontend API calls.
+
+Slide 4 - Backend architecture and responsibilities
+- `backend/app.py`
+  - Flask app bootstrap, CORS setup, MongoDB connection, and route registration.
+- `backend/controllers/login.py`
+  - Authenticates user credentials using bcrypt.
+- `backend/controllers/register.py`
+  - Creates user record with hashed password.
+- `backend/controllers/generate.py`
+  - Main SQL generation pipeline:
+    - build prompt and chain,
+    - invoke Gemini,
+    - extract SQL,
+    - enforce safety,
+    - execute against PostgreSQL,
+    - sanitize/format response.
+- `backend/services/schema_context.py`
+  - Introspects PostgreSQL schema and builds schema context block for prompt.
+
+Slide 5 - End-to-end request flow (plain text to SQL result)
+1) User asks question in chat UI.
+2) Frontend POSTs to `/generate` with:
+   - `question`, `session_id`, `email`, `password`.
+3) Backend validates request and resolves Gemini API key.
+4) Backend builds live database schema context.
+5) Backend composes system prompt + user question and invokes Gemini through LangChain.
+6) Model returns structured text containing SQL and explanation.
+7) Backend extracts SQL from response and validates it.
+8) Backend executes SQL in read-only PostgreSQL session with timeout and row limit.
+9) Backend sanitizes sensitive fields in result rows.
+10) Frontend displays SQL, explanation, result summary, and structured details in chat.
+
+Slide 6 - How conversion from plain English to SQL works
+- The app uses prompt engineering + schema grounding:
+  - Prompt tells model it is an expert PostgreSQL assistant.
+  - Prompt injects actual schema metadata (tables, columns, sample values/types).
+- Generation strategy:
+  - Ask model to output two sections: `SQL:` and `Explanation:`.
+  - SQL must be one PostgreSQL query and aligned with schema.
+- Parsing strategy:
+  - Backend tries to parse fenced `sql` code block first.
+  - Fallback parsing extracts first reasonable SELECT/WITH query if format is imperfect.
+- Result:
+  - Natural-language intent is transformed into SQL that is then actually executed.
+
+Slide 7 - Prompt design details
+- Prompt includes strict output contract:
+  - Return SQL inside code block.
+  - Return concise explanation text.
+- Prompt constraints include:
+  - PostgreSQL dialect only.
+  - Single statement only.
+  - Read-only query only.
+  - No destructive operations.
+  - Add reasonable LIMIT for large result sets.
+  - Match case-sensitive quoted identifiers when needed.
+- Why this matters:
+  - Improves determinism,
+  - Reduces malformed SQL,
+  - Aligns model output with executable production constraints.
+
+Slide 8 - Safety and guardrails under the hood
+- Query safety checks:
+  - Reject empty input.
+  - Reject non-read-only statements.
+  - Block dangerous SQL keywords (DDL/DML/truncation/admin patterns).
+  - Prevent `SELECT INTO` style write behavior.
+  - Enforce single-statement style and semicolon cleanup.
+- Execution safety:
+  - Open DB session as read-only.
+  - Apply statement timeout to prevent long-running queries.
+  - Enforce result row cap (`LIMIT`) when absent.
+- Data safety:
+  - Sensitive columns are masked/redacted in response payloads.
+  - Example patterns include password/token/api key-like fields.
+
+Slide 9 - Session and memory behavior
+- Frontend session model:
+  - Multiple chats managed in local React state.
+  - UI chat history is not persisted to a backend store.
+- Backend session model:
+  - Per-session conversational memory is stored in in-memory dictionary keyed by `session_id`.
+  - If `session_id` is missing/unknown, backend creates a new UUID.
+- Operational impact:
+  - Memory is temporary and can reset after backend restart.
+  - Chat continuity exists only while process state remains alive.
+
+Slide 10 - Current limitations and improvement opportunities
+- Security/auth:
+  - Improved: app now uses signed bearer tokens and protected routes verify `Authorization` header.
+  - Remaining gap: token is still in localStorage (better than password storage, but still vulnerable to XSS).
+  - Next hardening: rotate/revoke tokens, enforce stronger secret management, and move to HttpOnly secure cookie sessions.
+- Reliability:
+  - No explicit retry/backoff for transient LLM/database failures.
+- Persistence:
+  - Chat history is not durably persisted.
+- Product UX:
+  - Schema input modal exists but is not deeply integrated into data pipeline.
+- Documentation:
+  - README and implementation details can drift and should be synchronized regularly.
+
+Optional speaker close (30 seconds)
+- GenSQL combines a modern React chat interface with a Flask + LangChain backend to safely translate natural language into real PostgreSQL queries. Its strongest value is fast question-to-insight turnaround with read-only guardrails. Next evolution should focus on auth hardening, durable chat persistence, and production reliability features.

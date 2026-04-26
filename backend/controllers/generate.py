@@ -341,6 +341,11 @@ def _resolve_gemini_api_key(data, users_collection, is_valid):
     key = os.environ.get("GEMINI_API_KEY")
     if users_collection is None or is_valid is None:
         return key
+    auth_email = (data.get("authenticated_email") or "").strip()
+    if auth_email:
+        user = users_collection.find_one({"email": auth_email})
+        if user:
+            return user.get("gemini_api_key") or key
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
     if not email or not password:

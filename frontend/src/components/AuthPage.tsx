@@ -14,14 +14,18 @@ export const LoginPage = ({ setState }: ChildProps) => {
     if (authLoading) return
     try {
       setAuthLoading(true)
-      const { status } = await fetch(`${import.meta.env.VITE_API_BASE_URL}/login`,
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/login`,
         loginOptions('POST', username, password)
       );
 
-      if (status == 200) {
+      if (response.status == 200) {
+        const data = await response.json() as { token?: string; email?: string }
+        if (!data.token || !data.email) {
+          throw new Error('Missing auth token in login response')
+        }
         setState('home')
-        localStorage.setItem('username', username)
-        localStorage.setItem('password', password)
+        localStorage.setItem('username', data.email)
+        localStorage.setItem('auth_token', data.token)
       }
       setAuthLoading(false)
     } catch (error) {
@@ -83,14 +87,18 @@ export const RegisterPage = ({ setState }: ChildProps) => {
     if (authLoading) return
     try {
       setAuthLoading(true)
-      const { status } = await fetch(`${import.meta.env.VITE_API_BASE_URL}/register`,
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/register`,
         loginOptions('POST', username, password)
       );
 
-      if (status == 201) {
+      if (response.status == 201) {
+        const data = await response.json() as { token?: string; email?: string }
+        if (!data.token || !data.email) {
+          throw new Error('Missing auth token in register response')
+        }
         setState('home')
-        localStorage.setItem('username', username)
-        localStorage.setItem('password', password)
+        localStorage.setItem('username', data.email)
+        localStorage.setItem('auth_token', data.token)
       }
       setAuthLoading(false)
     } catch (error) {

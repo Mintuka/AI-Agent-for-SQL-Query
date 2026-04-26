@@ -6,6 +6,7 @@ from flask_cors import CORS
 from flask import Flask, request, jsonify
 from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import certifi
 import os
 
@@ -25,6 +26,38 @@ CORS(
 client = MongoClient(os.environ.get('MONGODB_URL'), tlsCAFile=certifi.where())
 db = client['querygpt']
 users_collection = db['users']
+
+
+def _get_token_serializer() -> URLSafeTimedSerializer:
+    secret = os.environ.get("AUTH_SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or os.environ.get("SECRET_KEY")
+    if not secret:
+        secret = "dev-insecure-secret-change-me"
+    return URLSafeTimedSerializer(secret_key=secret, salt="auth-token")
+
+
+def create_auth_token(email: str) -> str:
+    serializer = _get_token_serializer()
+    return serializer.dumps({"email": email})
+
+
+def verify_auth_token(token: str, max_age_seconds: int = 60 * 60 * 24 * 7) -> str | None:
+    serializer = _get_token_serializer()
+    try:
+        data = serializer.loads(token, max_age=max_age_seconds)
+        email = (data.get("email") or "").strip()
+        return email or None
+    except (BadSignature, SignatureExpired):
+        return None
+
+
+def get_email_from_request_auth() -> str | None:
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        return None
+    return verify_auth_token(token)
 
 @app.after_request
 def after_request(response):
@@ -52,37 +85,54 @@ def register():
     if request.method == "OPTIONS":
         return '', 204
     data = request.get_json() or {}
-    return register_user(data, users_collection, hash_password)
+    result = register_user(data, users_collection, hash_password)
+    if isinstance(result, tuple):
+        return result
+    token = create_auth_token(result["email"])
+    return jsonify({"message": result["message"], "user_id": result["user_id"], "email": result["email"], "token": token}), 201
 
 @app.route('/login', methods=['POST'])
 def login():
     if request.method == "OPTIONS":
         return '', 204
     data = request.get_json() or {}
-    return login_user(data, users_collection, is_valid)
+    result = login_user(data, users_collection, is_valid)
+    if isinstance(result, tuple):
+        return result
+    token = create_auth_token(result["email"])
+    return jsonify({"message": result["message"], "email": result["email"], "token": token}), 200
 
 
 @app.route("/generate", methods=["POST", "OPTIONS"])
 def generate():
     if request.method == "OPTIONS":
         return '', 204
+    email = get_email_from_request_auth()
+    if not email:
+        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json() or {}
+    data["authenticated_email"] = email
     return generate_answer(data, users_collection, is_valid)
+
+
+@app.route("/me", methods=["GET"])
+def me():
+    email = get_email_from_request_auth()
+    if not email:
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({"email": email}), 200
 
 @app.route('/settings/load', methods=['POST', 'OPTIONS'])
 def settings_load():
     if request.method == "OPTIONS":
         return '', 204
 
-    data = request.get_json() or {}
-    email = str(data.get("email", "")).strip()
-    password = str(data.get("password", ""))
-    if not email or not password:
-        return jsonify({"error": "Missing email or password"}), 400
-
+    email = get_email_from_request_auth()
+    if not email:
+        return jsonify({"error": "Unauthorized"}), 401
     user = users_collection.find_one({"email": email})
-    if not user or not is_valid(user["password"], password):
-        return jsonify({"error": "Incorrect email or password"}), 400
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
     return jsonify(
         {
@@ -100,16 +150,14 @@ def settings():
 
     data = request.get_json() or {}
     apikey = str(data.get("apikey", "")).strip()
-    email = str(data.get("email", "")).strip()
-    password = str(data.get("password", ""))
+    email = get_email_from_request_auth()
+    if not email:
+        return jsonify({"error": "Unauthorized"}), 401
     db_api_key_in = data.get("db_api_key")
 
-    if not email or not password:
-        return jsonify({"error": "Missing email or password"}), 400
-
     user = users_collection.find_one({"email": email})
-    if not user or not is_valid(user["password"], password):
-        return jsonify({"error": "Incorrect email or password"}), 400
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
     updates = {}
     if apikey:

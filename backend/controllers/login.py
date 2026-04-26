@@ -13,6 +13,7 @@ def login_user(data, users_collection, is_valid):
     if not is_password_valid:
         return jsonify({'error': 'Incorrect email or password'}), 400
     
-    return jsonify({
-        'message': 'User logged in successfully',
-    }), 200
+    return {
+        "email": email,
+        "message": "User logged in successfully",
+    }

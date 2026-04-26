@@ -149,7 +149,7 @@ const ChatPage = ({ setState }: ChildProps) => {
     const handleLogOut = () => {
       setState('login')
       localStorage.removeItem('username')
-      localStorage.removeItem('password')
+      localStorage.removeItem('auth_token')
     }
 
     const handleLike = () => {

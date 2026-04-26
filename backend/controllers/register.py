@@ -18,7 +18,8 @@ def register_user(data, users_collection, hash_password):
     
     result = users_collection.insert_one(new_user)
     
-    return jsonify({
-        'message': 'User registered successfully',
-        'user_id': str(result.inserted_id)
-    }), 201
+    return {
+        "email": email,
+        "message": "User registered successfully",
+        "user_id": str(result.inserted_id),
+    }
