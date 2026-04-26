@@ -173,7 +173,7 @@ const ChatPage = ({ setState }: ChildProps) => {
     }
 
     return (
-      <div className="w-full h-screen flex">
+      <div className="chat-theme w-full h-screen flex">
         {isSetting && <Settings setSettings={setSettings} />}
         <div className="flex w-full">
           {/* Sidebar */}
