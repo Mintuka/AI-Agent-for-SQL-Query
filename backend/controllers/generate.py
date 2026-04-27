@@ -93,7 +93,7 @@ def _normalize_postgres_url(url: str) -> str:
     return u
 
 
-def get_db_schema_context() -> str:
+def get_db_schema_context(postgres_url: str | None = None) -> str:
     """
     Cached schema + one sample row per table (see services.schema_context).
     """
@@ -105,7 +105,7 @@ def get_db_schema_context() -> str:
     if schema_cache["context"] and (now - schema_cache["ts"]) < SCHEMA_CACHE_TTL_SEC:
         return schema_cache["context"]
 
-    url = _get_postgres_url()
+    url = postgres_url or _get_postgres_url()
     ctx = build_postgres_llm_schema_context(url, max_tables=25) if url else ""
     schema_cache["context"] = ctx
     schema_cache["ts"] = now
@@ -258,10 +258,10 @@ def _add_limit_if_missing(sql: str, limit_rows: int) -> str:
     return f"SELECT * FROM ({sql}) AS sub LIMIT {limit_rows}"
 
 
-def execute_postgres_readonly(sql: str, limit_rows: int = 50) -> dict:
+def execute_postgres_readonly(sql: str, limit_rows: int = 50, postgres_url: str | None = None) -> dict:
     import psycopg2
 
-    postgres_url = _get_postgres_url()
+    postgres_url = postgres_url or _get_postgres_url()
     if not postgres_url:
         raise ValueError("Missing POSTGRES_URL in backend/.env")
 
@@ -356,6 +356,36 @@ def _resolve_gemini_api_key(data, users_collection, is_valid):
     return user.get("gemini_api_key") or key
 
 
+def _resolve_postgres_url(data, users_collection, is_valid):
+    """Prefer per-user db_api_key from MongoDB when credentials match; else env POSTGRES_URL."""
+    env_url = _get_postgres_url()
+    if users_collection is None or is_valid is None:
+        return env_url
+
+    auth_email = (data.get("authenticated_email") or "").strip()
+    if auth_email:
+        user = users_collection.find_one({"email": auth_email})
+        if user:
+            user_db_url = str(user.get("db_api_key") or "").strip()
+            if user_db_url:
+                return _normalize_postgres_url(user_db_url)
+            return env_url
+
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    if not email or not password:
+        return env_url
+
+    user = users_collection.find_one({"email": email})
+    if not user or not is_valid(user["password"], password):
+        return env_url
+
+    user_db_url = str(user.get("db_api_key") or "").strip()
+    if user_db_url:
+        return _normalize_postgres_url(user_db_url)
+    return env_url
+
+
 def generate_answer(data, users_collection=None, is_valid=None):
     question = data.get("question", "").strip()
     session_id = data.get("session_id")
@@ -367,11 +397,9 @@ def generate_answer(data, users_collection=None, is_valid=None):
         if not google_api_key:
             return jsonify({"error": "Missing GEMINI_API_KEY. Please set it via /settings."}), 400
 
-        postgres_url = _get_postgres_url()
-        if not postgres_url:
-            return jsonify({"error": "Missing POSTGRES_URL in backend/.env"}), 400
+        postgres_url = _resolve_postgres_url(data, users_collection, is_valid)
 
-        schema_context = get_db_schema_context()
+        schema_context = get_db_schema_context(postgres_url)
         schema_block = (
             schema_context
             if schema_context
@@ -418,12 +446,18 @@ def generate_answer(data, users_collection=None, is_valid=None):
         model_text = result.content if hasattr(result, "content") else str(result)
         sql, explanation = _extract_sql_and_explanation(model_text)
 
-        try:
-            results = execute_postgres_readonly(sql, limit_rows=50)
-            results = _sanitize_query_results(results)
-        except Exception as exec_err:
-            # Still return the generated SQL + explanation even if execution fails.
-            results = {"error": str(exec_err)}
+        if postgres_url:
+            try:
+                results = execute_postgres_readonly(sql, limit_rows=50, postgres_url=postgres_url)
+                results = _sanitize_query_results(results)
+            except Exception as exec_err:
+                # Still return the generated SQL + explanation even if execution fails.
+                results = {"error": str(exec_err)}
+        else:
+            # Allow SQL generation in environments that don't configure Postgres execution.
+            results = {
+                "info": "No POSTGRES_URL configured; skipped SQL execution and returned generated SQL only."
+            }
 
         # Keep `answer` for backwards-compat with the frontend, but prefer `explanation/results/sql`.
         answer = explanation
