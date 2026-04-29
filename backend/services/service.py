@@ -6,6 +6,7 @@ SENSITIVE_COLUMN_PATTERNS = [
     r"pin",
     r"otp",
     r"phone",
+    r"email",
     r"token",
     r"secret",
     r"api[_-]?key",
