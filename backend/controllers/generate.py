@@ -7,25 +7,13 @@ from dotenv import load_dotenv
 import re
 import uuid
 import os
+from services.service import SENSITIVE_COLUMN_PATTERNS
 
 load_dotenv()
 
 chat_history_store = {}
 schema_cache = {"ts": 0.0, "context": ""}
 SCHEMA_CACHE_TTL_SEC = 60 * 30  # refresh schema + samples every 30 minutes
-
-SENSITIVE_COLUMN_PATTERNS = [
-    r"^id$",
-    r"_id$",
-    r"password",
-    r"passcode",
-    r"token",
-    r"secret",
-    r"api[_-]?key",
-    r"access[_-]?key",
-    r"refresh[_-]?token",
-]
-
 
 def _is_sensitive_column(col: str) -> bool:
     c = (col or "").strip().lower()

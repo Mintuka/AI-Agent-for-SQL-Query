@@ -10,21 +10,7 @@ import re
 from typing import Any
 
 from psycopg2 import sql as psql
-
-SENSITIVE_COLUMN_PATTERNS = [
-    r"^id$",
-    r"_id$",
-    r"password",
-    r"passcode",
-    r"pin",
-    r"otp",
-    r"phone",
-    r"token",
-    r"secret",
-    r"api[_-]?key",
-    r"access[_-]?key",
-    r"refresh[_-]?token",
-]
+from services.service import SENSITIVE_COLUMN_PATTERNS
 
 
 def _is_sensitive_column(col: str) -> bool:
